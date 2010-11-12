@@ -4,28 +4,41 @@
  * Notes: This is a GameBoy Z80, not a Z80. There are differences.
  * Bugs: If PC wraps at the top of memory, this will not be caught until the end of an instruction
  */
-#include "./z80.h"
 
-void Z80::reset() {
-  _r.a=0; _r.b=0; _r.c=0; _r.d=0; _r.e=0; _r.h=0; _r.l=0; _r.f=0;
-  _r.sp=0; _r.pc=0; _r.i=0; _r.r=0;
-  _r.m=0;
-  _halt=0; _stop=0;
-  _clock.m=0;
-  _r.ime=1;
-  //LOG::out('Z80', 'Reset.');
-}
+struct R {
+  int a, b, c, d, e, h, l, f;
+  int sp;
+  int pc;
+  int i;
+  int r;
+  int m;
+  int ime;
+};  
+
+struct RSV {
+  int a, b, c, d, e, h, l, f;
+};
+
+struct Clock {
+  int m;
+};
+
+class Z80 {
+ public:
+  R _r; 
+  RSV _rsv;
+  Clock _clock;
+  int _halt;
+  int _stop;
+
+  void reset();
+  void exec();
+};
+
+
+//LOG.out('Z80', 'Reset.');
 
 /*
-void Z80::exec() {
-  _r.r = (_r.r+1) & 127;
-  _map[MMU.rb(_r.pc++)]();
-  _r.pc &= 65535;
-  _clock.m += _r.m;
-}
-
-
-
   _ops: {
   //--- Load/store ---
     LDrr_bb: function() { Z80._r.b=Z80._r.b; Z80._r.m=1; },
