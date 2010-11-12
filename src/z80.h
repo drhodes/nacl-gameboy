@@ -1,9 +1,9 @@
-/**
- * jsGB: Z80 core
- * Imran Nazar, May 2009
- * Notes: This is a GameBoy Z80, not a Z80. There are differences.
- * Bugs: If PC wraps at the top of memory, this will not be caught until the end of an instruction
- */
+// source derived from:
+//** jsGB: Z80 core
+//** Imran Nazar, May 2009
+//** Notes: This is a GameBoy Z80, not a Z80. There are differences.
+//** Bugs: If PC wraps at the top of memory, this will not be caught until the end of an instruction
+// ported to C++ by Derek A. Rhodes (physci@gmail.com) Fri Nov 12 17:52:20 EST 2010
 
 struct R {
   int a, b, c, d, e, h, l, f;
@@ -25,808 +25,617 @@ struct Clock {
 
 class Z80 {
  public:
-  R _r; 
-  RSV _rsv;
-  Clock _clock;
-  int _halt;
-  int _stop;
+  // CPU State -------------------------------------------------------
+  static R _r; 
+  static RSV _rsv;
+  static Clock _clock;
+  static int _halt;
+  static int _stop;  
+  static void (*_map[512])();
+  static void (*_cbmap[512])();
+   
+  // -----------------------------------------------------------------
+  static void Init();
+  static void reset();
+  static void exec();
 
-  void reset();
-  void exec();
-};
+  static void rsv();
+  static void rrs();
+  static void MAPcb();
+  static void XX();
+
+  static void UNKNOWN();
+  
+  static void LDrr_bb();
+  static void LDrr_bc();
+  static void LDrr_bd();
+  static void LDrr_be();
+  static void LDrr_bh();
+  static void LDrr_bl();
+  static void LDrr_ba();
+  static void LDrr_cb();
+  static void LDrr_cc();
+  static void LDrr_cd();
+  static void LDrr_ce();
+  static void LDrr_ch();
+
+  static void LDrr_cl();
+  static void LDrr_ca();
+  static void LDrr_db();
+  static void LDrr_dc();
+  static void LDrr_dd();
+  static void LDrr_de();
+  static void LDrr_dh();
+  static void LDrr_dl();
+  static void LDrr_da();
+  static void LDrr_eb();
+  static void LDrr_ec();
+  static void LDrr_ed();
+  static void LDrr_ee();
+  static void LDrr_eh();
+  static void LDrr_el();
+  static void LDrr_ea();
+  static void LDrr_hb();
+  static void LDrr_hc();
+  static void LDrr_hd();
+  static void LDrr_he();
+  static void LDrr_hh();
+  static void LDrr_hl();
+  static void LDrr_ha();
+  static void LDrr_lb();
+  static void LDrr_lc();
+  static void LDrr_ld();
+  static void LDrr_le();
+  static void LDrr_lh();
+  static void LDrr_ll();
+  static void LDrr_la();
+  static void LDrr_ab();
+  static void LDrr_ac();
+  static void LDrr_ad();
+  static void LDrr_ae();
+  static void LDrr_ah();
+  static void LDrr_al();
+  static void LDrr_aa();
 
 
-//LOG.out('Z80', 'Reset.');
+  static void LDrHLm_b();
+  static void LDrHLm_c();
+  static void LDrHLm_d();
+  static void LDrHLm_e();
+  static void LDrHLm_h();
+  static void LDrHLm_l();
+  static void LDrHLm_a();
 
-/*
-  _ops: {
-  //--- Load/store ---
-    LDrr_bb: function() { Z80._r.b=Z80._r.b; Z80._r.m=1; },
-    LDrr_bc: function() { Z80._r.b=Z80._r.c; Z80._r.m=1; },
-    LDrr_bd: function() { Z80._r.b=Z80._r.d; Z80._r.m=1; },
-    LDrr_be: function() { Z80._r.b=Z80._r.e; Z80._r.m=1; },
-    LDrr_bh: function() { Z80._r.b=Z80._r.h; Z80._r.m=1; },
-    LDrr_bl: function() { Z80._r.b=Z80._r.l; Z80._r.m=1; },
-    LDrr_ba: function() { Z80._r.b=Z80._r.a; Z80._r.m=1; },
-    LDrr_cb: function() { Z80._r.c=Z80._r.b; Z80._r.m=1; },
-    LDrr_cc: function() { Z80._r.c=Z80._r.c; Z80._r.m=1; },
-    LDrr_cd: function() { Z80._r.c=Z80._r.d; Z80._r.m=1; },
-    LDrr_ce: function() { Z80._r.c=Z80._r.e; Z80._r.m=1; },
-    LDrr_ch: function() { Z80._r.c=Z80._r.h; Z80._r.m=1; },
+  static void LDHLmr_b();
+  static void LDHLmr_c();
+  static void LDHLmr_d();
+  static void LDHLmr_e();
+  static void LDHLmr_h();
+  static void LDHLmr_l();
+  static void LDHLmr_a();
 
-    LDrr_cl: function() { Z80._r.c=Z80._r.l; Z80._r.m=1; },
-    LDrr_ca: function() { Z80._r.c=Z80._r.a; Z80._r.m=1; },
-    LDrr_db: function() { Z80._r.d=Z80._r.b; Z80._r.m=1; },
-    LDrr_dc: function() { Z80._r.d=Z80._r.c; Z80._r.m=1; },
-    LDrr_dd: function() { Z80._r.d=Z80._r.d; Z80._r.m=1; },
-    LDrr_de: function() { Z80._r.d=Z80._r.e; Z80._r.m=1; },
-    LDrr_dh: function() { Z80._r.d=Z80._r.h; Z80._r.m=1; },
-    LDrr_dl: function() { Z80._r.d=Z80._r.l; Z80._r.m=1; },
-    LDrr_da: function() { Z80._r.d=Z80._r.a; Z80._r.m=1; },
-    LDrr_eb: function() { Z80._r.e=Z80._r.b; Z80._r.m=1; },
-    LDrr_ec: function() { Z80._r.e=Z80._r.c; Z80._r.m=1; },
-    LDrr_ed: function() { Z80._r.e=Z80._r.d; Z80._r.m=1; },
-    LDrr_ee: function() { Z80._r.e=Z80._r.e; Z80._r.m=1; },
-    LDrr_eh: function() { Z80._r.e=Z80._r.h; Z80._r.m=1; },
-    LDrr_el: function() { Z80._r.e=Z80._r.l; Z80._r.m=1; },
-    LDrr_ea: function() { Z80._r.e=Z80._r.a; Z80._r.m=1; },
-    LDrr_hb: function() { Z80._r.h=Z80._r.b; Z80._r.m=1; },
-    LDrr_hc: function() { Z80._r.h=Z80._r.c; Z80._r.m=1; },
-    LDrr_hd: function() { Z80._r.h=Z80._r.d; Z80._r.m=1; },
-    LDrr_he: function() { Z80._r.h=Z80._r.e; Z80._r.m=1; },
-    LDrr_hh: function() { Z80._r.h=Z80._r.h; Z80._r.m=1; },
-    LDrr_hl: function() { Z80._r.h=Z80._r.l; Z80._r.m=1; },
-    LDrr_ha: function() { Z80._r.h=Z80._r.a; Z80._r.m=1; },
-    LDrr_lb: function() { Z80._r.l=Z80._r.b; Z80._r.m=1; },
-    LDrr_lc: function() { Z80._r.l=Z80._r.c; Z80._r.m=1; },
-    LDrr_ld: function() { Z80._r.l=Z80._r.d; Z80._r.m=1; },
-    LDrr_le: function() { Z80._r.l=Z80._r.e; Z80._r.m=1; },
-    LDrr_lh: function() { Z80._r.l=Z80._r.h; Z80._r.m=1; },
-    LDrr_ll: function() { Z80._r.l=Z80._r.l; Z80._r.m=1; },
-    LDrr_la: function() { Z80._r.l=Z80._r.a; Z80._r.m=1; },
-    LDrr_ab: function() { Z80._r.a=Z80._r.b; Z80._r.m=1; },
-    LDrr_ac: function() { Z80._r.a=Z80._r.c; Z80._r.m=1; },
-    LDrr_ad: function() { Z80._r.a=Z80._r.d; Z80._r.m=1; },
-    LDrr_ae: function() { Z80._r.a=Z80._r.e; Z80._r.m=1; },
-    LDrr_ah: function() { Z80._r.a=Z80._r.h; Z80._r.m=1; },
-    LDrr_al: function() { Z80._r.a=Z80._r.l; Z80._r.m=1; },
-    LDrr_aa: function() { Z80._r.a=Z80._r.a; Z80._r.m=1; },
+  static void LDrn_b();
+  static void LDrn_c();
+  static void LDrn_d();
+  static void LDrn_e();
+  static void LDrn_h();
+  static void LDrn_l();
+  static void LDrn_a();
 
-    LDrHLm_b: function() { Z80._r.b=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.m=2; },
-    LDrHLm_c: function() { Z80._r.c=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.m=2; },
-    LDrHLm_d: function() { Z80._r.d=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.m=2; },
-    LDrHLm_e: function() { Z80._r.e=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.m=2; },
-    LDrHLm_h: function() { Z80._r.h=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.m=2; },
-    LDrHLm_l: function() { Z80._r.l=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.m=2; },
-    LDrHLm_a: function() { Z80._r.a=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.m=2; },
+  static void LDHLmn();
 
-    LDHLmr_b: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l,Z80._r.b); Z80._r.m=2; },
-    LDHLmr_c: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l,Z80._r.c); Z80._r.m=2; },
-    LDHLmr_d: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l,Z80._r.d); Z80._r.m=2; },
-    LDHLmr_e: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l,Z80._r.e); Z80._r.m=2; },
-    LDHLmr_h: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l,Z80._r.h); Z80._r.m=2; },
-    LDHLmr_l: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l,Z80._r.l); Z80._r.m=2; },
-    LDHLmr_a: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l,Z80._r.a); Z80._r.m=2; },
+  static void LDBCmA();
+  static void LDDEmA();
 
-    LDrn_b: function() { Z80._r.b=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.m=2; },
-    LDrn_c: function() { Z80._r.c=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.m=2; },
-    LDrn_d: function() { Z80._r.d=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.m=2; },
-    LDrn_e: function() { Z80._r.e=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.m=2; },
-    LDrn_h: function() { Z80._r.h=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.m=2; },
-    LDrn_l: function() { Z80._r.l=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.m=2; },
-    LDrn_a: function() { Z80._r.a=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.m=2; },
+  static void LDmmA();
 
-    LDHLmn: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l, MMU.rb(Z80._r.pc)); Z80._r.pc++; Z80._r.m=3; },
+  static void LDABCm();
+  static void LDADEm();
 
-    LDBCmA: function() { MMU.wb((Z80._r.b<<8)+Z80._r.c, Z80._r.a); Z80._r.m=2; },
-    LDDEmA: function() { MMU.wb((Z80._r.d<<8)+Z80._r.e, Z80._r.a); Z80._r.m=2; },
+  static void LDAmm();
 
-    LDmmA: function() { MMU.wb(MMU.rw(Z80._r.pc), Z80._r.a); Z80._r.pc+=2; Z80._r.m=4; },
+  static void LDBCnn();
+  static void LDDEnn();
+  static void LDHLnn();
+  static void LDSPnn();
 
-    LDABCm: function() { Z80._r.a=MMU.rb((Z80._r.b<<8)+Z80._r.c); Z80._r.m=2; },
-    LDADEm: function() { Z80._r.a=MMU.rb((Z80._r.d<<8)+Z80._r.e); Z80._r.m=2; },
+  static void LDHLmm();
+  static void LDmmHL();
 
-    LDAmm: function() { Z80._r.a=MMU.rb(MMU.rw(Z80._r.pc)); Z80._r.pc+=2; Z80._r.m=4; },
+  static void LDHLIA();
+  static void LDAHLI();
 
-    LDBCnn: function() { Z80._r.c=MMU.rb(Z80._r.pc); Z80._r.b=MMU.rb(Z80._r.pc+1); Z80._r.pc+=2; Z80._r.m=3; },
-    LDDEnn: function() { Z80._r.e=MMU.rb(Z80._r.pc); Z80._r.d=MMU.rb(Z80._r.pc+1); Z80._r.pc+=2; Z80._r.m=3; },
-    LDHLnn: function() { Z80._r.l=MMU.rb(Z80._r.pc); Z80._r.h=MMU.rb(Z80._r.pc+1); Z80._r.pc+=2; Z80._r.m=3; },
-    LDSPnn: function() { Z80._r.sp=MMU.rw(Z80._r.pc); Z80._r.pc+=2; Z80._r.m=3; },
+  static void LDHLDA();
+  static void LDAHLD();
 
-    LDHLmm: function() { var i=MMU.rw(Z80._r.pc); Z80._r.pc+=2; Z80._r.l=MMU.rb(i); Z80._r.h=MMU.rb(i+1); Z80._r.m=5; },
-    LDmmHL: function() { var i=MMU.rw(Z80._r.pc); Z80._r.pc+=2; MMU.ww(i,(Z80._r.h<<8)+Z80._r.l); Z80._r.m=5; },
+  static void LDAIOn();
+  static void LDIOnA();
+  static void LDAIOC();
+  static void LDIOCA();
 
-    LDHLIA: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l, Z80._r.a); Z80._r.l=(Z80._r.l+1)&255; if(!Z80._r.l) Z80._r.h=(Z80._r.h+1)&255; Z80._r.m=2; },
-    LDAHLI: function() { Z80._r.a=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.l=(Z80._r.l+1)&255; if(!Z80._r.l) Z80._r.h=(Z80._r.h+1)&255; Z80._r.m=2; },
+  static void LDHLSPn();
 
-    LDHLDA: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l, Z80._r.a); Z80._r.l=(Z80._r.l-1)&255; if(Z80._r.l==255) Z80._r.h=(Z80._r.h-1)&255; Z80._r.m=2; },
-    LDAHLD: function() { Z80._r.a=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.l=(Z80._r.l-1)&255; if(Z80._r.l==255) Z80._r.h=(Z80._r.h-1)&255; Z80._r.m=2; },
-
-    LDAIOn: function() { Z80._r.a=MMU.rb(0xFF00+MMU.rb(Z80._r.pc)); Z80._r.pc++; Z80._r.m=3; },
-    LDIOnA: function() { MMU.wb(0xFF00+MMU.rb(Z80._r.pc),Z80._r.a); Z80._r.pc++; Z80._r.m=3; },
-    LDAIOC: function() { Z80._r.a=MMU.rb(0xFF00+Z80._r.c); Z80._r.m=2; },
-    LDIOCA: function() { MMU.wb(0xFF00+Z80._r.c,Z80._r.a); Z80._r.m=2; },
-
-    LDHLSPn: function() { var i=MMU.rb(Z80._r.pc); if(i>127) i=-((~i+1)&255); Z80._r.pc++; i+=Z80._r.sp; Z80._r.h=(i>>8)&255; Z80._r.l=i&255; Z80._r.m=3; },
-
-    SWAPr_b: function() { var tr=Z80._r.b; Z80._r.b=((tr&0xF)<<4)|((tr&0xF0)>>4); Z80._r.f=Z80._r.b?0:0x80; Z80._r.m=1; },
-    SWAPr_c: function() { var tr=Z80._r.c; Z80._r.c=((tr&0xF)<<4)|((tr&0xF0)>>4); Z80._r.f=Z80._r.c?0:0x80; Z80._r.m=1; },
-    SWAPr_d: function() { var tr=Z80._r.d; Z80._r.d=((tr&0xF)<<4)|((tr&0xF0)>>4); Z80._r.f=Z80._r.d?0:0x80; Z80._r.m=1; },
-    SWAPr_e: function() { var tr=Z80._r.e; Z80._r.e=((tr&0xF)<<4)|((tr&0xF0)>>4); Z80._r.f=Z80._r.e?0:0x80; Z80._r.m=1; },
-    SWAPr_h: function() { var tr=Z80._r.h; Z80._r.h=((tr&0xF)<<4)|((tr&0xF0)>>4); Z80._r.f=Z80._r.h?0:0x80; Z80._r.m=1; },
-    SWAPr_l: function() { var tr=Z80._r.l; Z80._r.l=((tr&0xF)<<4)|((tr&0xF0)>>4); Z80._r.f=Z80._r.l?0:0x80; Z80._r.m=1; },
-    SWAPr_a: function() { var tr=Z80._r.a; Z80._r.a=((tr&0xF)<<4)|((tr&0xF0)>>4); Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
+  static void SWAPr_b();
+  static void SWAPr_c();
+  static void SWAPr_d();
+  static void SWAPr_e();
+  static void SWAPr_h();
+  static void SWAPr_l();
+  static void SWAPr_a();
 
   //--- Data processing ---
-    ADDr_b: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.b; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.b^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADDr_c: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.c; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.c^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADDr_d: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.d; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.d^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADDr_e: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.e; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.e^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADDr_h: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.h; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.h^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADDr_l: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.l; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.l^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADDr_a: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.a; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.a^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADDHL: function() { var a=Z80._r.a; var m=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.a+=m; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^a^m)&0x10) Z80._r.f|=0x20; Z80._r.m=2; },
-    ADDn: function() { var a=Z80._r.a; var m=MMU.rb(Z80._r.pc); Z80._r.a+=m; Z80._r.pc++; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^a^m)&0x10) Z80._r.f|=0x20; Z80._r.m=2; },
-    ADDHLBC: function() { var hl=(Z80._r.h<<8)+Z80._r.l; hl+=(Z80._r.b<<8)+Z80._r.c; if(hl>65535) Z80._r.f|=0x10; else Z80._r.f&=0xEF; Z80._r.h=(hl>>8)&255; Z80._r.l=hl&255; Z80._r.m=3; },
-    ADDHLDE: function() { var hl=(Z80._r.h<<8)+Z80._r.l; hl+=(Z80._r.d<<8)+Z80._r.e; if(hl>65535) Z80._r.f|=0x10; else Z80._r.f&=0xEF; Z80._r.h=(hl>>8)&255; Z80._r.l=hl&255; Z80._r.m=3; },
-    ADDHLHL: function() { var hl=(Z80._r.h<<8)+Z80._r.l; hl+=(Z80._r.h<<8)+Z80._r.l; if(hl>65535) Z80._r.f|=0x10; else Z80._r.f&=0xEF; Z80._r.h=(hl>>8)&255; Z80._r.l=hl&255; Z80._r.m=3; },
-    ADDHLSP: function() { var hl=(Z80._r.h<<8)+Z80._r.l; hl+=Z80._r.sp; if(hl>65535) Z80._r.f|=0x10; else Z80._r.f&=0xEF; Z80._r.h=(hl>>8)&255; Z80._r.l=hl&255; Z80._r.m=3; },
-    ADDSPn: function() { var i=MMU.rb(Z80._r.pc); if(i>127) i=-((~i+1)&255); Z80._r.pc++; Z80._r.sp+=i; Z80._r.m=4; },
+  static void ADDr_b();
+  static void ADDr_c();
+  static void ADDr_d();
+  static void ADDr_e();
+  static void ADDr_h();
+  static void ADDr_l();
+  static void ADDr_a();
+  static void ADDHL();
+  static void ADDn();
+  static void ADDHLBC();
+  static void ADDHLDE();
+  static void ADDHLHL();
+  static void ADDHLSP();
+  static void ADDSPn();
 
-    ADCr_b: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.b; Z80._r.a+=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.b^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADCr_c: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.c; Z80._r.a+=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.c^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADCr_d: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.d; Z80._r.a+=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.d^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADCr_e: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.e; Z80._r.a+=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.e^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADCr_h: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.h; Z80._r.a+=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.h^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADCr_l: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.l; Z80._r.a+=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.l^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADCr_a: function() { var a=Z80._r.a; Z80._r.a+=Z80._r.a; Z80._r.a+=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.a^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    ADCHL: function() { var a=Z80._r.a; var m=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.a+=m; Z80._r.a+=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^m^a)&0x10) Z80._r.f|=0x20; Z80._r.m=2; },
-    ADCn: function() { var a=Z80._r.a; var m=MMU.rb(Z80._r.pc); Z80._r.a+=m; Z80._r.pc++; Z80._r.a+=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a>255)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^m^a)&0x10) Z80._r.f|=0x20; Z80._r.m=2; },
+  static void ADCr_b();
+  static void ADCr_c();
+  static void ADCr_d();
+  static void ADCr_e();
+  static void ADCr_h();
+  static void ADCr_l();
+  static void ADCr_a();
 
-    SUBr_b: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.b; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.b^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SUBr_c: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.c; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.c^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SUBr_d: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.d; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.d^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SUBr_e: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.e; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.e^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SUBr_h: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.h; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.h^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SUBr_l: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.l; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.l^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SUBr_a: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.a; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.a^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SUBHL: function() { var a=Z80._r.a; var m=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.a-=m; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^m^a)&0x10) Z80._r.f|=0x20; Z80._r.m=2; },
-    SUBn: function() { var a=Z80._r.a; var m=MMU.rb(Z80._r.pc); Z80._r.a-=m; Z80._r.pc++; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^m^a)&0x10) Z80._r.f|=0x20; Z80._r.m=2; },
+  static void ADCHL();
+  static void ADCn();
 
-    SBCr_b: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.b; Z80._r.a-=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.b^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SBCr_c: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.c; Z80._r.a-=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.c^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SBCr_d: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.d; Z80._r.a-=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.d^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SBCr_e: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.e; Z80._r.a-=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.e^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SBCr_h: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.h; Z80._r.a-=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.h^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SBCr_l: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.l; Z80._r.a-=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.l^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SBCr_a: function() { var a=Z80._r.a; Z80._r.a-=Z80._r.a; Z80._r.a-=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.a^a)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    SBCHL: function() { var a=Z80._r.a; var m=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.a-=m; Z80._r.a-=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^m^a)&0x10) Z80._r.f|=0x20; Z80._r.m=2; },
-    SBCn: function() { var a=Z80._r.a; var m=MMU.rb(Z80._r.pc); Z80._r.a-=m; Z80._r.pc++; Z80._r.a-=(Z80._r.f&0x10)?1:0; Z80._r.f=(Z80._r.a<0)?0x50:0x40; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; if((Z80._r.a^m^a)&0x10) Z80._r.f|=0x20; Z80._r.m=2; },
+  static void SUBr_b();
+  static void SUBr_c();
+  static void SUBr_d();
+  static void SUBr_e();
+  static void SUBr_h();
+  static void SUBr_l();
+  static void SUBr_a();
+  static void SUBHL();
+  static void SUBn();
+ 
+  static void SBCr_b();
+  static void SBCr_c();
+  static void SBCr_d();
+  static void SBCr_e();
+  static void SBCr_h();
+  static void SBCr_l();
+  static void SBCr_a();
+  
+  static void SBCHL();
+  static void SBCn();
+  
+  static void CPr_b();
+  static void CPr_c();
+  static void CPr_d();
+  static void CPr_e();
+  static void CPr_h();
+  static void CPr_l();
+  static void CPr_a();
+  
+  static void CPHL();
+  static void CPn();
+  
+  static void DAA();
+  
+  static void ANDr_b();
+  static void ANDr_c();
+  static void ANDr_d();
+  static void ANDr_e();
+  static void ANDr_h();
+  static void ANDr_l();
+  static void ANDr_a();
+  static void ANDHL();
+  static void ANDn();
+  
+  static void ORr_b();
+  static void ORr_c();
+  static void ORr_d();
+  static void ORr_e();
+  static void ORr_h();
+  static void ORr_l();
+  static void ORr_a();
+  static void ORHL();
+  static void ORn();
+  
+  static void XORr_b();
+  static void XORr_c();
+  static void XORr_d();
+  static void XORr_e();
+  static void XORr_h();
+  static void XORr_l();
+  static void XORr_a();
+  static void XORHL();
+  static void XORn();
+  
+  static void INCr_b();
+  static void INCr_c();
+  static void INCr_d();
+  static void INCr_e();
+  static void INCr_h();
+  static void INCr_l();
+  static void INCr_a();
+  static void INCHLm();
+  
+  static void DECr_b();
+  static void DECr_c();
+  static void DECr_d();
+  static void DECr_e();
+  static void DECr_h();
+  static void DECr_l();
+  static void DECr_a();
+  static void DECHLm();
+  
+  static void INCBC();
+  static void INCDE();
+  static void INCHL();
+  static void INCSP();
+  
+  static void DECBC();
+  static void DECDE();
+  static void DECHL();
+  static void DECSP();
+  
+  //--- Bit ulation ---
+  static void BIT0b();
+  static void BIT0c();
+  static void BIT0d();
+  static void BIT0e();
+  static void BIT0h();
+  static void BIT0l();
+  static void BIT0a();
+  static void BIT0m();
+  
+  static void RES0b();
+  static void RES0c();
+  static void RES0d();
+  static void RES0e();
+  static void RES0h();
+  static void RES0l();
+  static void RES0a();
+  static void RES0m();
+  
+  static void SET0b();
+  static void SET0c();
+  static void SET0d();
+  static void SET0e();
+  static void SET0h();
+  static void SET0l();
+  static void SET0a();
+  static void SET0m();
+  
+  static void BIT1b();
+  static void BIT1c();
+  static void BIT1d();
+  static void BIT1e();
+  static void BIT1h();
+  static void BIT1l();
+  static void BIT1a();
+  static void BIT1m();
+  
+  static void RES1b();
+  static void RES1c();
+  static void RES1d();
+  static void RES1e();
+  static void RES1h();
+  static void RES1l();
+  static void RES1a();
+  static void RES1m();
+  
+  static void SET1b();
+  static void SET1c();
+  static void SET1d();
+  static void SET1e();
+  static void SET1h();
+  static void SET1l();
+  static void SET1a();
+  static void SET1m();
+  
+  static void BIT2b();
+  static void BIT2c();
+  static void BIT2d();
+  static void BIT2e();
+  static void BIT2h();
+  static void BIT2l();
+  static void BIT2a();
+  static void BIT2m();
+  
+  static void RES2b();
+  static void RES2c();
+  static void RES2d();
+  static void RES2e();
+  static void RES2h();
+  static void RES2l();
+  static void RES2a();
+  static void RES2m();
+  
+  static void SET2b();
+  static void SET2c();
+  static void SET2d();
+  static void SET2e();
+  static void SET2h();
+  static void SET2l();
+  static void SET2a();
+  static void SET2m();
+  
+  static void BIT3b();
+  static void BIT3c();
+  static void BIT3d();
+  static void BIT3e();
+  static void BIT3h();
+  static void BIT3l();
+  static void BIT3a();
+  static void BIT3m();
+  
+  static void RES3b();
+  static void RES3c();
+  static void RES3d();
+  static void RES3e();
+  static void RES3h();
+  static void RES3l();
+  static void RES3a();
+  static void RES3m();
+  
+  static void SET3b();
+  static void SET3c();
+  static void SET3d();
+  static void SET3e();
+  static void SET3h();
+  static void SET3l();
+  static void SET3a();
+  static void SET3m();
+  
+  static void BIT4b();
+  static void BIT4c();
+  static void BIT4d();
+  static void BIT4e();
+  static void BIT4h();
+  static void BIT4l();
+  static void BIT4a();
+  static void BIT4m();
+  
+  static void RES4b();
+  static void RES4c();
+  static void RES4d();
+  static void RES4e();
+  static void RES4h();
+  static void RES4l();
+  static void RES4a();
+  static void RES4m();
+  
+  static void SET4b();
+  static void SET4c();
+  static void SET4d();
+  static void SET4e();
+  static void SET4h();
+  static void SET4l();
+  static void SET4a();
+  static void SET4m();
+  
+  static void BIT5b();
+  static void BIT5c();
+  static void BIT5d();
+  static void BIT5e();
+  static void BIT5h();
+  static void BIT5l();
+  static void BIT5a();
+  static void BIT5m();
+  
+  static void RES5b();
+  static void RES5c();
+  static void RES5d();
+  static void RES5e();
+  static void RES5h();
+  static void RES5l();
+  static void RES5a();
+  static void RES5m();
+  
+  static void SET5b();
+  static void SET5c();
+  static void SET5d();
+  static void SET5e();
+  static void SET5h();
+  static void SET5l();
+  static void SET5a();
+  static void SET5m();
+  
+  static void BIT6b();
+  static void BIT6c();
+  static void BIT6d();
+  static void BIT6e();
+  static void BIT6h();
+  static void BIT6l();
+  static void BIT6a();
+  static void BIT6m();
+  
+  static void RES6b();
+  static void RES6c();
+  static void RES6d();
+  static void RES6e();
+  static void RES6h();
+  static void RES6l();
+  static void RES6a();
+  static void RES6m();
+  
+  static void SET6b();
+  static void SET6c();
+  static void SET6d();
+  static void SET6e();
+  static void SET6h();
+  static void SET6l();
+  static void SET6a();
+  static void SET6m();
+  
+  static void BIT7b();
+  static void BIT7c();
+  static void BIT7d();
+  static void BIT7e();
+  static void BIT7h();
+  static void BIT7l();
+  static void BIT7a();
+  static void BIT7m();
+  
+  static void RES7b();
+  static void RES7c();
+  static void RES7d();
+  static void RES7e();
+  static void RES7h();
+  static void RES7l();
+  static void RES7a();
+  static void RES7m();
+  
+  static void SET7b();
+  static void SET7c();
+  static void SET7d();
+  static void SET7e();
+  static void SET7h();
+  static void SET7l();
+  static void SET7a();
+  static void SET7m();
+  
+  static void RLA();
+  static void RLCA();
+  static void RRA();
+  static void RRCA();
+  
+  static void RLr_b();
+  static void RLr_c();
+  static void RLr_d();
+  static void RLr_e();
+  static void RLr_h();
+  static void RLr_l();
+  static void RLr_a();
+  static void RLHL();
+  
+  static void RLCr_b();
+  static void RLCr_c();
+  static void RLCr_d();
+  static void RLCr_e();
+  static void RLCr_h();
+  static void RLCr_l();
+  static void RLCr_a();
+  static void RLCHL();
+  
+  static void RRr_b();
+  static void RRr_c();
+  static void RRr_d();
+  static void RRr_e();
+  static void RRr_h();
+  static void RRr_l();
+  static void RRr_a();
+  static void RRHL();
+  
+  static void RRCr_b();
+  static void RRCr_c();
+  static void RRCr_d();
+  static void RRCr_e();
+  static void RRCr_h();
+  static void RRCr_l();
+  static void RRCr_a();
+  static void RRCHL();
+  
+  static void SLAr_b();
+  static void SLAr_c();
+  static void SLAr_d();
+  static void SLAr_e();
+  static void SLAr_h();
+  static void SLAr_l();
+  static void SLAr_a();
+  
+  static void SLLr_b();
+  static void SLLr_c();
+  static void SLLr_d();
+  static void SLLr_e();
+  static void SLLr_h();
+  static void SLLr_l();
+  static void SLLr_a();
+  
+  static void SRAr_b();
+  static void SRAr_c();
+  static void SRAr_d();
+  static void SRAr_e();
+  static void SRAr_h();
+  static void SRAr_l();
+  static void SRAr_a();
+  
+  static void SRLr_b();
+  static void SRLr_c();
+  static void SRLr_d();
+  static void SRLr_e();
+  static void SRLr_h();
+  static void SRLr_l();
+  static void SRLr_a();
+  
+  static void CPL();
+  static void NEG();
 
-    CPr_b: function() { var i=Z80._r.a; i-=Z80._r.b; Z80._r.f=(i<0)?0x50:0x40; i&=255; if(!i) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.b^i)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    CPr_c: function() { var i=Z80._r.a; i-=Z80._r.c; Z80._r.f=(i<0)?0x50:0x40; i&=255; if(!i) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.c^i)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    CPr_d: function() { var i=Z80._r.a; i-=Z80._r.d; Z80._r.f=(i<0)?0x50:0x40; i&=255; if(!i) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.d^i)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    CPr_e: function() { var i=Z80._r.a; i-=Z80._r.e; Z80._r.f=(i<0)?0x50:0x40; i&=255; if(!i) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.e^i)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    CPr_h: function() { var i=Z80._r.a; i-=Z80._r.h; Z80._r.f=(i<0)?0x50:0x40; i&=255; if(!i) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.h^i)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    CPr_l: function() { var i=Z80._r.a; i-=Z80._r.l; Z80._r.f=(i<0)?0x50:0x40; i&=255; if(!i) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.l^i)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    CPr_a: function() { var i=Z80._r.a; i-=Z80._r.a; Z80._r.f=(i<0)?0x50:0x40; i&=255; if(!i) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.a^i)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
-    CPHL: function() { var i=Z80._r.a; var m=MMU.rb((Z80._r.h<<8)+Z80._r.l); i-=m; Z80._r.f=(i<0)?0x50:0x40; i&=255; if(!i) Z80._r.f|=0x80; if((Z80._r.a^i^m)&0x10) Z80._r.f|=0x20; Z80._r.m=2; },
-    CPn: function() { var i=Z80._r.a; var m=MMU.rb(Z80._r.pc); i-=m; Z80._r.pc++; Z80._r.f=(i<0)?0x50:0x40; i&=255; if(!i) Z80._r.f|=0x80; if((Z80._r.a^i^m)&0x10) Z80._r.f|=0x20; Z80._r.m=2; },
-
-    DAA: function() { var a=Z80._r.a; if((Z80._r.f&0x20)||((Z80._r.a&15)>9)) Z80._r.a+=6; Z80._r.f&=0xEF; if((Z80._r.f&0x20)||(a>0x99)) { Z80._r.a+=0x60; Z80._r.f|=0x10; } Z80._r.m=1; },
-
-    ANDr_b: function() { Z80._r.a&=Z80._r.b; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ANDr_c: function() { Z80._r.a&=Z80._r.c; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ANDr_d: function() { Z80._r.a&=Z80._r.d; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ANDr_e: function() { Z80._r.a&=Z80._r.e; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ANDr_h: function() { Z80._r.a&=Z80._r.h; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ANDr_l: function() { Z80._r.a&=Z80._r.l; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ANDr_a: function() { Z80._r.a&=Z80._r.a; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ANDHL: function() { Z80._r.a&=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=2; },
-    ANDn: function() { Z80._r.a&=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=2; },
-
-    ORr_b: function() { Z80._r.a|=Z80._r.b; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ORr_c: function() { Z80._r.a|=Z80._r.c; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ORr_d: function() { Z80._r.a|=Z80._r.d; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ORr_e: function() { Z80._r.a|=Z80._r.e; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ORr_h: function() { Z80._r.a|=Z80._r.h; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ORr_l: function() { Z80._r.a|=Z80._r.l; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ORr_a: function() { Z80._r.a|=Z80._r.a; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    ORHL: function() { Z80._r.a|=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=2; },
-    ORn: function() { Z80._r.a|=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=2; },
-
-    XORr_b: function() { Z80._r.a^=Z80._r.b; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    XORr_c: function() { Z80._r.a^=Z80._r.c; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    XORr_d: function() { Z80._r.a^=Z80._r.d; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    XORr_e: function() { Z80._r.a^=Z80._r.e; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    XORr_h: function() { Z80._r.a^=Z80._r.h; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    XORr_l: function() { Z80._r.a^=Z80._r.l; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    XORr_a: function() { Z80._r.a^=Z80._r.a; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    XORHL: function() { Z80._r.a^=MMU.rb((Z80._r.h<<8)+Z80._r.l); Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=2; },
-    XORn: function() { Z80._r.a^=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=2; },
-
-    INCr_b: function() { Z80._r.b++; Z80._r.b&=255; Z80._r.f=Z80._r.b?0:0x80; Z80._r.m=1; },
-    INCr_c: function() { Z80._r.c++; Z80._r.c&=255; Z80._r.f=Z80._r.c?0:0x80; Z80._r.m=1; },
-    INCr_d: function() { Z80._r.d++; Z80._r.d&=255; Z80._r.f=Z80._r.d?0:0x80; Z80._r.m=1; },
-    INCr_e: function() { Z80._r.e++; Z80._r.e&=255; Z80._r.f=Z80._r.e?0:0x80; Z80._r.m=1; },
-    INCr_h: function() { Z80._r.h++; Z80._r.h&=255; Z80._r.f=Z80._r.h?0:0x80; Z80._r.m=1; },
-    INCr_l: function() { Z80._r.l++; Z80._r.l&=255; Z80._r.f=Z80._r.l?0:0x80; Z80._r.m=1; },
-    INCr_a: function() { Z80._r.a++; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    INCHLm: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l)+1; i&=255; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.f=i?0:0x80; Z80._r.m=3; },
-
-    DECr_b: function() { Z80._r.b--; Z80._r.b&=255; Z80._r.f=Z80._r.b?0:0x80; Z80._r.m=1; },
-    DECr_c: function() { Z80._r.c--; Z80._r.c&=255; Z80._r.f=Z80._r.c?0:0x80; Z80._r.m=1; },
-    DECr_d: function() { Z80._r.d--; Z80._r.d&=255; Z80._r.f=Z80._r.d?0:0x80; Z80._r.m=1; },
-    DECr_e: function() { Z80._r.e--; Z80._r.e&=255; Z80._r.f=Z80._r.e?0:0x80; Z80._r.m=1; },
-    DECr_h: function() { Z80._r.h--; Z80._r.h&=255; Z80._r.f=Z80._r.h?0:0x80; Z80._r.m=1; },
-    DECr_l: function() { Z80._r.l--; Z80._r.l&=255; Z80._r.f=Z80._r.l?0:0x80; Z80._r.m=1; },
-    DECr_a: function() { Z80._r.a--; Z80._r.a&=255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    DECHLm: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l)-1; i&=255; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.f=i?0:0x80; Z80._r.m=3; },
-
-    INCBC: function() { Z80._r.c=(Z80._r.c+1)&255; if(!Z80._r.c) Z80._r.b=(Z80._r.b+1)&255; Z80._r.m=1; },
-    INCDE: function() { Z80._r.e=(Z80._r.e+1)&255; if(!Z80._r.e) Z80._r.d=(Z80._r.d+1)&255; Z80._r.m=1; },
-    INCHL: function() { Z80._r.l=(Z80._r.l+1)&255; if(!Z80._r.l) Z80._r.h=(Z80._r.h+1)&255; Z80._r.m=1; },
-    INCSP: function() { Z80._r.sp=(Z80._r.sp+1)&65535; Z80._r.m=1; },
-
-    DECBC: function() { Z80._r.c=(Z80._r.c-1)&255; if(Z80._r.c==255) Z80._r.b=(Z80._r.b-1)&255; Z80._r.m=1; },
-    DECDE: function() { Z80._r.e=(Z80._r.e-1)&255; if(Z80._r.e==255) Z80._r.d=(Z80._r.d-1)&255; Z80._r.m=1; },
-    DECHL: function() { Z80._r.l=(Z80._r.l-1)&255; if(Z80._r.l==255) Z80._r.h=(Z80._r.h-1)&255; Z80._r.m=1; },
-    DECSP: function() { Z80._r.sp=(Z80._r.sp-1)&65535; Z80._r.m=1; },
-
-    //--- Bit manipulation ---
-    BIT0b: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.b&0x01)?0:0x80; Z80._r.m=2; },
-    BIT0c: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.c&0x01)?0:0x80; Z80._r.m=2; },
-    BIT0d: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.d&0x01)?0:0x80; Z80._r.m=2; },
-    BIT0e: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.e&0x01)?0:0x80; Z80._r.m=2; },
-    BIT0h: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.h&0x01)?0:0x80; Z80._r.m=2; },
-    BIT0l: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.l&0x01)?0:0x80; Z80._r.m=2; },
-    BIT0a: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.a&0x01)?0:0x80; Z80._r.m=2; },
-    BIT0m: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(MMU.rb((Z80._r.h<<8)+Z80._r.l)&0x01)?0:0x80; Z80._r.m=3; },
-
-    RES0b: function() { Z80._r.b&=0xFE; Z80._r.m=2; },
-    RES0c: function() { Z80._r.c&=0xFE; Z80._r.m=2; },
-    RES0d: function() { Z80._r.d&=0xFE; Z80._r.m=2; },
-    RES0e: function() { Z80._r.e&=0xFE; Z80._r.m=2; },
-    RES0h: function() { Z80._r.h&=0xFE; Z80._r.m=2; },
-    RES0l: function() { Z80._r.l&=0xFE; Z80._r.m=2; },
-    RES0a: function() { Z80._r.a&=0xFE; Z80._r.m=2; },
-    RES0m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i&=0xFE; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    SET0b: function() { Z80._r.b|=0x01; Z80._r.m=2; },
-    SET0c: function() { Z80._r.b|=0x01; Z80._r.m=2; },
-    SET0d: function() { Z80._r.b|=0x01; Z80._r.m=2; },
-    SET0e: function() { Z80._r.b|=0x01; Z80._r.m=2; },
-    SET0h: function() { Z80._r.b|=0x01; Z80._r.m=2; },
-    SET0l: function() { Z80._r.b|=0x01; Z80._r.m=2; },
-    SET0a: function() { Z80._r.b|=0x01; Z80._r.m=2; },
-    SET0m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i|=0x01; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    BIT1b: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.b&0x02)?0:0x80; Z80._r.m=2; },
-    BIT1c: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.c&0x02)?0:0x80; Z80._r.m=2; },
-    BIT1d: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.d&0x02)?0:0x80; Z80._r.m=2; },
-    BIT1e: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.e&0x02)?0:0x80; Z80._r.m=2; },
-    BIT1h: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.h&0x02)?0:0x80; Z80._r.m=2; },
-    BIT1l: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.l&0x02)?0:0x80; Z80._r.m=2; },
-    BIT1a: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.a&0x02)?0:0x80; Z80._r.m=2; },
-    BIT1m: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(MMU.rb((Z80._r.h<<8)+Z80._r.l)&0x02)?0:0x80; Z80._r.m=3; },
-
-    RES1b: function() { Z80._r.b&=0xFD; Z80._r.m=2; },
-    RES1c: function() { Z80._r.c&=0xFD; Z80._r.m=2; },
-    RES1d: function() { Z80._r.d&=0xFD; Z80._r.m=2; },
-    RES1e: function() { Z80._r.e&=0xFD; Z80._r.m=2; },
-    RES1h: function() { Z80._r.h&=0xFD; Z80._r.m=2; },
-    RES1l: function() { Z80._r.l&=0xFD; Z80._r.m=2; },
-    RES1a: function() { Z80._r.a&=0xFD; Z80._r.m=2; },
-    RES1m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i&=0xFD; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    SET1b: function() { Z80._r.b|=0x02; Z80._r.m=2; },
-    SET1c: function() { Z80._r.b|=0x02; Z80._r.m=2; },
-    SET1d: function() { Z80._r.b|=0x02; Z80._r.m=2; },
-    SET1e: function() { Z80._r.b|=0x02; Z80._r.m=2; },
-    SET1h: function() { Z80._r.b|=0x02; Z80._r.m=2; },
-    SET1l: function() { Z80._r.b|=0x02; Z80._r.m=2; },
-    SET1a: function() { Z80._r.b|=0x02; Z80._r.m=2; },
-    SET1m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i|=0x02; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    BIT2b: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.b&0x04)?0:0x80; Z80._r.m=2; },
-    BIT2c: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.c&0x04)?0:0x80; Z80._r.m=2; },
-    BIT2d: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.d&0x04)?0:0x80; Z80._r.m=2; },
-    BIT2e: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.e&0x04)?0:0x80; Z80._r.m=2; },
-    BIT2h: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.h&0x04)?0:0x80; Z80._r.m=2; },
-    BIT2l: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.l&0x04)?0:0x80; Z80._r.m=2; },
-    BIT2a: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.a&0x04)?0:0x80; Z80._r.m=2; },
-    BIT2m: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(MMU.rb((Z80._r.h<<8)+Z80._r.l)&0x04)?0:0x80; Z80._r.m=3; },
-
-    RES2b: function() { Z80._r.b&=0xFB; Z80._r.m=2; },
-    RES2c: function() { Z80._r.c&=0xFB; Z80._r.m=2; },
-    RES2d: function() { Z80._r.d&=0xFB; Z80._r.m=2; },
-    RES2e: function() { Z80._r.e&=0xFB; Z80._r.m=2; },
-    RES2h: function() { Z80._r.h&=0xFB; Z80._r.m=2; },
-    RES2l: function() { Z80._r.l&=0xFB; Z80._r.m=2; },
-    RES2a: function() { Z80._r.a&=0xFB; Z80._r.m=2; },
-    RES2m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i&=0xFB; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    SET2b: function() { Z80._r.b|=0x04; Z80._r.m=2; },
-    SET2c: function() { Z80._r.b|=0x04; Z80._r.m=2; },
-    SET2d: function() { Z80._r.b|=0x04; Z80._r.m=2; },
-    SET2e: function() { Z80._r.b|=0x04; Z80._r.m=2; },
-    SET2h: function() { Z80._r.b|=0x04; Z80._r.m=2; },
-    SET2l: function() { Z80._r.b|=0x04; Z80._r.m=2; },
-    SET2a: function() { Z80._r.b|=0x04; Z80._r.m=2; },
-    SET2m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i|=0x04; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    BIT3b: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.b&0x08)?0:0x80; Z80._r.m=2; },
-    BIT3c: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.c&0x08)?0:0x80; Z80._r.m=2; },
-    BIT3d: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.d&0x08)?0:0x80; Z80._r.m=2; },
-    BIT3e: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.e&0x08)?0:0x80; Z80._r.m=2; },
-    BIT3h: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.h&0x08)?0:0x80; Z80._r.m=2; },
-    BIT3l: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.l&0x08)?0:0x80; Z80._r.m=2; },
-    BIT3a: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.a&0x08)?0:0x80; Z80._r.m=2; },
-    BIT3m: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(MMU.rb((Z80._r.h<<8)+Z80._r.l)&0x08)?0:0x80; Z80._r.m=3; },
-
-    RES3b: function() { Z80._r.b&=0xF7; Z80._r.m=2; },
-    RES3c: function() { Z80._r.c&=0xF7; Z80._r.m=2; },
-    RES3d: function() { Z80._r.d&=0xF7; Z80._r.m=2; },
-    RES3e: function() { Z80._r.e&=0xF7; Z80._r.m=2; },
-    RES3h: function() { Z80._r.h&=0xF7; Z80._r.m=2; },
-    RES3l: function() { Z80._r.l&=0xF7; Z80._r.m=2; },
-    RES3a: function() { Z80._r.a&=0xF7; Z80._r.m=2; },
-    RES3m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i&=0xF7; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    SET3b: function() { Z80._r.b|=0x08; Z80._r.m=2; },
-    SET3c: function() { Z80._r.b|=0x08; Z80._r.m=2; },
-    SET3d: function() { Z80._r.b|=0x08; Z80._r.m=2; },
-    SET3e: function() { Z80._r.b|=0x08; Z80._r.m=2; },
-    SET3h: function() { Z80._r.b|=0x08; Z80._r.m=2; },
-    SET3l: function() { Z80._r.b|=0x08; Z80._r.m=2; },
-    SET3a: function() { Z80._r.b|=0x08; Z80._r.m=2; },
-    SET3m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i|=0x08; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    BIT4b: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.b&0x10)?0:0x80; Z80._r.m=2; },
-    BIT4c: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.c&0x10)?0:0x80; Z80._r.m=2; },
-    BIT4d: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.d&0x10)?0:0x80; Z80._r.m=2; },
-    BIT4e: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.e&0x10)?0:0x80; Z80._r.m=2; },
-    BIT4h: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.h&0x10)?0:0x80; Z80._r.m=2; },
-    BIT4l: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.l&0x10)?0:0x80; Z80._r.m=2; },
-    BIT4a: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.a&0x10)?0:0x80; Z80._r.m=2; },
-    BIT4m: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(MMU.rb((Z80._r.h<<8)+Z80._r.l)&0x10)?0:0x80; Z80._r.m=3; },
-
-    RES4b: function() { Z80._r.b&=0xEF; Z80._r.m=2; },
-    RES4c: function() { Z80._r.c&=0xEF; Z80._r.m=2; },
-    RES4d: function() { Z80._r.d&=0xEF; Z80._r.m=2; },
-    RES4e: function() { Z80._r.e&=0xEF; Z80._r.m=2; },
-    RES4h: function() { Z80._r.h&=0xEF; Z80._r.m=2; },
-    RES4l: function() { Z80._r.l&=0xEF; Z80._r.m=2; },
-    RES4a: function() { Z80._r.a&=0xEF; Z80._r.m=2; },
-    RES4m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i&=0xEF; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    SET4b: function() { Z80._r.b|=0x10; Z80._r.m=2; },
-    SET4c: function() { Z80._r.b|=0x10; Z80._r.m=2; },
-    SET4d: function() { Z80._r.b|=0x10; Z80._r.m=2; },
-    SET4e: function() { Z80._r.b|=0x10; Z80._r.m=2; },
-    SET4h: function() { Z80._r.b|=0x10; Z80._r.m=2; },
-    SET4l: function() { Z80._r.b|=0x10; Z80._r.m=2; },
-    SET4a: function() { Z80._r.b|=0x10; Z80._r.m=2; },
-    SET4m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i|=0x10; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    BIT5b: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.b&0x20)?0:0x80; Z80._r.m=2; },
-    BIT5c: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.c&0x20)?0:0x80; Z80._r.m=2; },
-    BIT5d: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.d&0x20)?0:0x80; Z80._r.m=2; },
-    BIT5e: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.e&0x20)?0:0x80; Z80._r.m=2; },
-    BIT5h: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.h&0x20)?0:0x80; Z80._r.m=2; },
-    BIT5l: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.l&0x20)?0:0x80; Z80._r.m=2; },
-    BIT5a: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.a&0x20)?0:0x80; Z80._r.m=2; },
-    BIT5m: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(MMU.rb((Z80._r.h<<8)+Z80._r.l)&0x20)?0:0x80; Z80._r.m=3; },
-
-    RES5b: function() { Z80._r.b&=0xDF; Z80._r.m=2; },
-    RES5c: function() { Z80._r.c&=0xDF; Z80._r.m=2; },
-    RES5d: function() { Z80._r.d&=0xDF; Z80._r.m=2; },
-    RES5e: function() { Z80._r.e&=0xDF; Z80._r.m=2; },
-    RES5h: function() { Z80._r.h&=0xDF; Z80._r.m=2; },
-    RES5l: function() { Z80._r.l&=0xDF; Z80._r.m=2; },
-    RES5a: function() { Z80._r.a&=0xDF; Z80._r.m=2; },
-    RES5m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i&=0xDF; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    SET5b: function() { Z80._r.b|=0x20; Z80._r.m=2; },
-    SET5c: function() { Z80._r.b|=0x20; Z80._r.m=2; },
-    SET5d: function() { Z80._r.b|=0x20; Z80._r.m=2; },
-    SET5e: function() { Z80._r.b|=0x20; Z80._r.m=2; },
-    SET5h: function() { Z80._r.b|=0x20; Z80._r.m=2; },
-    SET5l: function() { Z80._r.b|=0x20; Z80._r.m=2; },
-    SET5a: function() { Z80._r.b|=0x20; Z80._r.m=2; },
-    SET5m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i|=0x20; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    BIT6b: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.b&0x40)?0:0x80; Z80._r.m=2; },
-    BIT6c: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.c&0x40)?0:0x80; Z80._r.m=2; },
-    BIT6d: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.d&0x40)?0:0x80; Z80._r.m=2; },
-    BIT6e: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.e&0x40)?0:0x80; Z80._r.m=2; },
-    BIT6h: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.h&0x40)?0:0x80; Z80._r.m=2; },
-    BIT6l: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.l&0x40)?0:0x80; Z80._r.m=2; },
-    BIT6a: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.a&0x40)?0:0x80; Z80._r.m=2; },
-    BIT6m: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(MMU.rb((Z80._r.h<<8)+Z80._r.l)&0x40)?0:0x80; Z80._r.m=3; },
-
-    RES6b: function() { Z80._r.b&=0xBF; Z80._r.m=2; },
-    RES6c: function() { Z80._r.c&=0xBF; Z80._r.m=2; },
-    RES6d: function() { Z80._r.d&=0xBF; Z80._r.m=2; },
-    RES6e: function() { Z80._r.e&=0xBF; Z80._r.m=2; },
-    RES6h: function() { Z80._r.h&=0xBF; Z80._r.m=2; },
-    RES6l: function() { Z80._r.l&=0xBF; Z80._r.m=2; },
-    RES6a: function() { Z80._r.a&=0xBF; Z80._r.m=2; },
-    RES6m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i&=0xBF; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    SET6b: function() { Z80._r.b|=0x40; Z80._r.m=2; },
-    SET6c: function() { Z80._r.b|=0x40; Z80._r.m=2; },
-    SET6d: function() { Z80._r.b|=0x40; Z80._r.m=2; },
-    SET6e: function() { Z80._r.b|=0x40; Z80._r.m=2; },
-    SET6h: function() { Z80._r.b|=0x40; Z80._r.m=2; },
-    SET6l: function() { Z80._r.b|=0x40; Z80._r.m=2; },
-    SET6a: function() { Z80._r.b|=0x40; Z80._r.m=2; },
-    SET6m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i|=0x40; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    BIT7b: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.b&0x80)?0:0x80; Z80._r.m=2; },
-    BIT7c: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.c&0x80)?0:0x80; Z80._r.m=2; },
-    BIT7d: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.d&0x80)?0:0x80; Z80._r.m=2; },
-    BIT7e: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.e&0x80)?0:0x80; Z80._r.m=2; },
-    BIT7h: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.h&0x80)?0:0x80; Z80._r.m=2; },
-    BIT7l: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.l&0x80)?0:0x80; Z80._r.m=2; },
-    BIT7a: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.a&0x80)?0:0x80; Z80._r.m=2; },
-    BIT7m: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(MMU.rb((Z80._r.h<<8)+Z80._r.l)&0x80)?0:0x80; Z80._r.m=3; },
-
-    RES7b: function() { Z80._r.b&=0x7F; Z80._r.m=2; },
-    RES7c: function() { Z80._r.c&=0x7F; Z80._r.m=2; },
-    RES7d: function() { Z80._r.d&=0x7F; Z80._r.m=2; },
-    RES7e: function() { Z80._r.e&=0x7F; Z80._r.m=2; },
-    RES7h: function() { Z80._r.h&=0x7F; Z80._r.m=2; },
-    RES7l: function() { Z80._r.l&=0x7F; Z80._r.m=2; },
-    RES7a: function() { Z80._r.a&=0x7F; Z80._r.m=2; },
-    RES7m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i&=0x7F; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    SET7b: function() { Z80._r.b|=0x80; Z80._r.m=2; },
-    SET7c: function() { Z80._r.b|=0x80; Z80._r.m=2; },
-    SET7d: function() { Z80._r.b|=0x80; Z80._r.m=2; },
-    SET7e: function() { Z80._r.b|=0x80; Z80._r.m=2; },
-    SET7h: function() { Z80._r.b|=0x80; Z80._r.m=2; },
-    SET7l: function() { Z80._r.b|=0x80; Z80._r.m=2; },
-    SET7a: function() { Z80._r.b|=0x80; Z80._r.m=2; },
-    SET7m: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); i|=0x80; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.m=4; },
-
-    RLA: function() { var ci=Z80._r.f&0x10?1:0; var co=Z80._r.a&0x80?0x10:0; Z80._r.a=(Z80._r.a<<1)+ci; Z80._r.a&=255; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=1; },
-    RLCA: function() { var ci=Z80._r.a&0x80?1:0; var co=Z80._r.a&0x80?0x10:0; Z80._r.a=(Z80._r.a<<1)+ci; Z80._r.a&=255; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=1; },
-    RRA: function() { var ci=Z80._r.f&0x10?0x80:0; var co=Z80._r.a&1?0x10:0; Z80._r.a=(Z80._r.a>>1)+ci; Z80._r.a&=255; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=1; },
-    RRCA: function() { var ci=Z80._r.a&1?0x80:0; var co=Z80._r.a&1?0x10:0; Z80._r.a=(Z80._r.a>>1)+ci; Z80._r.a&=255; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=1; },
-
-    RLr_b: function() { var ci=Z80._r.f&0x10?1:0; var co=Z80._r.b&0x80?0x10:0; Z80._r.b=(Z80._r.b<<1)+ci; Z80._r.b&=255; Z80._r.f=(Z80._r.b)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLr_c: function() { var ci=Z80._r.f&0x10?1:0; var co=Z80._r.c&0x80?0x10:0; Z80._r.c=(Z80._r.c<<1)+ci; Z80._r.c&=255; Z80._r.f=(Z80._r.c)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLr_d: function() { var ci=Z80._r.f&0x10?1:0; var co=Z80._r.d&0x80?0x10:0; Z80._r.d=(Z80._r.d<<1)+ci; Z80._r.d&=255; Z80._r.f=(Z80._r.d)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLr_e: function() { var ci=Z80._r.f&0x10?1:0; var co=Z80._r.e&0x80?0x10:0; Z80._r.e=(Z80._r.e<<1)+ci; Z80._r.e&=255; Z80._r.f=(Z80._r.e)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLr_h: function() { var ci=Z80._r.f&0x10?1:0; var co=Z80._r.h&0x80?0x10:0; Z80._r.h=(Z80._r.h<<1)+ci; Z80._r.h&=255; Z80._r.f=(Z80._r.h)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLr_l: function() { var ci=Z80._r.f&0x10?1:0; var co=Z80._r.l&0x80?0x10:0; Z80._r.l=(Z80._r.l<<1)+ci; Z80._r.l&=255; Z80._r.f=(Z80._r.l)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLr_a: function() { var ci=Z80._r.f&0x10?1:0; var co=Z80._r.a&0x80?0x10:0; Z80._r.a=(Z80._r.a<<1)+ci; Z80._r.a&=255; Z80._r.f=(Z80._r.a)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLHL: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); var ci=Z80._r.f&0x10?1:0; var co=i&0x80?0x10:0; i=(i<<1)+ci; i&=255; Z80._r.f=(i)?0:0x80; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=4; },
-
-    RLCr_b: function() { var ci=Z80._r.b&0x80?1:0; var co=Z80._r.b&0x80?0x10:0; Z80._r.b=(Z80._r.b<<1)+ci; Z80._r.b&=255; Z80._r.f=(Z80._r.b)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLCr_c: function() { var ci=Z80._r.c&0x80?1:0; var co=Z80._r.c&0x80?0x10:0; Z80._r.c=(Z80._r.c<<1)+ci; Z80._r.c&=255; Z80._r.f=(Z80._r.c)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLCr_d: function() { var ci=Z80._r.d&0x80?1:0; var co=Z80._r.d&0x80?0x10:0; Z80._r.d=(Z80._r.d<<1)+ci; Z80._r.d&=255; Z80._r.f=(Z80._r.d)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLCr_e: function() { var ci=Z80._r.e&0x80?1:0; var co=Z80._r.e&0x80?0x10:0; Z80._r.e=(Z80._r.e<<1)+ci; Z80._r.e&=255; Z80._r.f=(Z80._r.e)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLCr_h: function() { var ci=Z80._r.h&0x80?1:0; var co=Z80._r.h&0x80?0x10:0; Z80._r.h=(Z80._r.h<<1)+ci; Z80._r.h&=255; Z80._r.f=(Z80._r.h)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLCr_l: function() { var ci=Z80._r.l&0x80?1:0; var co=Z80._r.l&0x80?0x10:0; Z80._r.l=(Z80._r.l<<1)+ci; Z80._r.l&=255; Z80._r.f=(Z80._r.l)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLCr_a: function() { var ci=Z80._r.a&0x80?1:0; var co=Z80._r.a&0x80?0x10:0; Z80._r.a=(Z80._r.a<<1)+ci; Z80._r.a&=255; Z80._r.f=(Z80._r.a)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RLCHL: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); var ci=i&0x80?1:0; var co=i&0x80?0x10:0; i=(i<<1)+ci; i&=255; Z80._r.f=(i)?0:0x80; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=4; },
-
-    RRr_b: function() { var ci=Z80._r.f&0x10?0x80:0; var co=Z80._r.b&1?0x10:0; Z80._r.b=(Z80._r.b>>1)+ci; Z80._r.b&=255; Z80._r.f=(Z80._r.b)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRr_c: function() { var ci=Z80._r.f&0x10?0x80:0; var co=Z80._r.c&1?0x10:0; Z80._r.c=(Z80._r.c>>1)+ci; Z80._r.c&=255; Z80._r.f=(Z80._r.c)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRr_d: function() { var ci=Z80._r.f&0x10?0x80:0; var co=Z80._r.d&1?0x10:0; Z80._r.d=(Z80._r.d>>1)+ci; Z80._r.d&=255; Z80._r.f=(Z80._r.d)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRr_e: function() { var ci=Z80._r.f&0x10?0x80:0; var co=Z80._r.e&1?0x10:0; Z80._r.e=(Z80._r.e>>1)+ci; Z80._r.e&=255; Z80._r.f=(Z80._r.e)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRr_h: function() { var ci=Z80._r.f&0x10?0x80:0; var co=Z80._r.h&1?0x10:0; Z80._r.h=(Z80._r.h>>1)+ci; Z80._r.h&=255; Z80._r.f=(Z80._r.h)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRr_l: function() { var ci=Z80._r.f&0x10?0x80:0; var co=Z80._r.l&1?0x10:0; Z80._r.l=(Z80._r.l>>1)+ci; Z80._r.l&=255; Z80._r.f=(Z80._r.l)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRr_a: function() { var ci=Z80._r.f&0x10?0x80:0; var co=Z80._r.a&1?0x10:0; Z80._r.a=(Z80._r.a>>1)+ci; Z80._r.a&=255; Z80._r.f=(Z80._r.a)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRHL: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); var ci=Z80._r.f&0x10?0x80:0; var co=i&1?0x10:0; i=(i>>1)+ci; i&=255; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.f=(i)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=4; },
-
-    RRCr_b: function() { var ci=Z80._r.b&1?0x80:0; var co=Z80._r.b&1?0x10:0; Z80._r.b=(Z80._r.b>>1)+ci; Z80._r.b&=255; Z80._r.f=(Z80._r.b)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRCr_c: function() { var ci=Z80._r.c&1?0x80:0; var co=Z80._r.c&1?0x10:0; Z80._r.c=(Z80._r.c>>1)+ci; Z80._r.c&=255; Z80._r.f=(Z80._r.c)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRCr_d: function() { var ci=Z80._r.d&1?0x80:0; var co=Z80._r.d&1?0x10:0; Z80._r.d=(Z80._r.d>>1)+ci; Z80._r.d&=255; Z80._r.f=(Z80._r.d)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRCr_e: function() { var ci=Z80._r.e&1?0x80:0; var co=Z80._r.e&1?0x10:0; Z80._r.e=(Z80._r.e>>1)+ci; Z80._r.e&=255; Z80._r.f=(Z80._r.e)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRCr_h: function() { var ci=Z80._r.h&1?0x80:0; var co=Z80._r.h&1?0x10:0; Z80._r.h=(Z80._r.h>>1)+ci; Z80._r.h&=255; Z80._r.f=(Z80._r.h)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRCr_l: function() { var ci=Z80._r.l&1?0x80:0; var co=Z80._r.l&1?0x10:0; Z80._r.l=(Z80._r.l>>1)+ci; Z80._r.l&=255; Z80._r.f=(Z80._r.l)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRCr_a: function() { var ci=Z80._r.a&1?0x80:0; var co=Z80._r.a&1?0x10:0; Z80._r.a=(Z80._r.a>>1)+ci; Z80._r.a&=255; Z80._r.f=(Z80._r.a)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    RRCHL: function() { var i=MMU.rb((Z80._r.h<<8)+Z80._r.l); var ci=i&1?0x80:0; var co=i&1?0x10:0; i=(i>>1)+ci; i&=255; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.f=(i)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=4; },
-
-    SLAr_b: function() { var co=Z80._r.b&0x80?0x10:0; Z80._r.b=(Z80._r.b<<1)&255; Z80._r.f=(Z80._r.b)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SLAr_c: function() { var co=Z80._r.c&0x80?0x10:0; Z80._r.c=(Z80._r.c<<1)&255; Z80._r.f=(Z80._r.c)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SLAr_d: function() { var co=Z80._r.d&0x80?0x10:0; Z80._r.d=(Z80._r.d<<1)&255; Z80._r.f=(Z80._r.d)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SLAr_e: function() { var co=Z80._r.e&0x80?0x10:0; Z80._r.e=(Z80._r.e<<1)&255; Z80._r.f=(Z80._r.e)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SLAr_h: function() { var co=Z80._r.h&0x80?0x10:0; Z80._r.h=(Z80._r.h<<1)&255; Z80._r.f=(Z80._r.h)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SLAr_l: function() { var co=Z80._r.l&0x80?0x10:0; Z80._r.l=(Z80._r.l<<1)&255; Z80._r.f=(Z80._r.l)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SLAr_a: function() { var co=Z80._r.a&0x80?0x10:0; Z80._r.a=(Z80._r.a<<1)&255; Z80._r.f=(Z80._r.a)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-
-    SLLr_b: function() { var co=Z80._r.b&0x80?0x10:0; Z80._r.b=(Z80._r.b<<1)&255+1; Z80._r.f=(Z80._r.b)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SLLr_c: function() { var co=Z80._r.c&0x80?0x10:0; Z80._r.c=(Z80._r.c<<1)&255+1; Z80._r.f=(Z80._r.c)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SLLr_d: function() { var co=Z80._r.d&0x80?0x10:0; Z80._r.d=(Z80._r.d<<1)&255+1; Z80._r.f=(Z80._r.d)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SLLr_e: function() { var co=Z80._r.e&0x80?0x10:0; Z80._r.e=(Z80._r.e<<1)&255+1; Z80._r.f=(Z80._r.e)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SLLr_h: function() { var co=Z80._r.h&0x80?0x10:0; Z80._r.h=(Z80._r.h<<1)&255+1; Z80._r.f=(Z80._r.h)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SLLr_l: function() { var co=Z80._r.l&0x80?0x10:0; Z80._r.l=(Z80._r.l<<1)&255+1; Z80._r.f=(Z80._r.l)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SLLr_a: function() { var co=Z80._r.a&0x80?0x10:0; Z80._r.a=(Z80._r.a<<1)&255+1; Z80._r.f=(Z80._r.a)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-
-    SRAr_b: function() { var ci=Z80._r.b&0x80; var co=Z80._r.b&1?0x10:0; Z80._r.b=((Z80._r.b>>1)+ci)&255; Z80._r.f=(Z80._r.b)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SRAr_c: function() { var ci=Z80._r.c&0x80; var co=Z80._r.c&1?0x10:0; Z80._r.c=((Z80._r.c>>1)+ci)&255; Z80._r.f=(Z80._r.c)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SRAr_d: function() { var ci=Z80._r.d&0x80; var co=Z80._r.d&1?0x10:0; Z80._r.d=((Z80._r.d>>1)+ci)&255; Z80._r.f=(Z80._r.d)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SRAr_e: function() { var ci=Z80._r.e&0x80; var co=Z80._r.e&1?0x10:0; Z80._r.e=((Z80._r.e>>1)+ci)&255; Z80._r.f=(Z80._r.e)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SRAr_h: function() { var ci=Z80._r.h&0x80; var co=Z80._r.h&1?0x10:0; Z80._r.h=((Z80._r.h>>1)+ci)&255; Z80._r.f=(Z80._r.h)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SRAr_l: function() { var ci=Z80._r.l&0x80; var co=Z80._r.l&1?0x10:0; Z80._r.l=((Z80._r.l>>1)+ci)&255; Z80._r.f=(Z80._r.l)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SRAr_a: function() { var ci=Z80._r.a&0x80; var co=Z80._r.a&1?0x10:0; Z80._r.a=((Z80._r.a>>1)+ci)&255; Z80._r.f=(Z80._r.a)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-
-    SRLr_b: function() { var co=Z80._r.b&1?0x10:0; Z80._r.b=(Z80._r.b>>1)&255; Z80._r.f=(Z80._r.b)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SRLr_c: function() { var co=Z80._r.c&1?0x10:0; Z80._r.c=(Z80._r.c>>1)&255; Z80._r.f=(Z80._r.c)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SRLr_d: function() { var co=Z80._r.d&1?0x10:0; Z80._r.d=(Z80._r.d>>1)&255; Z80._r.f=(Z80._r.d)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SRLr_e: function() { var co=Z80._r.e&1?0x10:0; Z80._r.e=(Z80._r.e>>1)&255; Z80._r.f=(Z80._r.e)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SRLr_h: function() { var co=Z80._r.h&1?0x10:0; Z80._r.h=(Z80._r.h>>1)&255; Z80._r.f=(Z80._r.h)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SRLr_l: function() { var co=Z80._r.l&1?0x10:0; Z80._r.l=(Z80._r.l>>1)&255; Z80._r.f=(Z80._r.l)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-    SRLr_a: function() { var co=Z80._r.a&1?0x10:0; Z80._r.a=(Z80._r.a>>1)&255; Z80._r.f=(Z80._r.a)?0:0x80; Z80._r.f=(Z80._r.f&0xEF)+co; Z80._r.m=2; },
-
-    CPL: function() { Z80._r.a ^= 255; Z80._r.f=Z80._r.a?0:0x80; Z80._r.m=1; },
-    NEG: function() { Z80._r.a=0-Z80._r.a; Z80._r.f=(Z80._r.a<0)?0x10:0; Z80._r.a&=255; if(!Z80._r.a) Z80._r.f|=0x80; Z80._r.m=2; },
-
-    CCF: function() { var ci=Z80._r.f&0x10?0:0x10; Z80._r.f=(Z80._r.f&0xEF)+ci; Z80._r.m=1; },
-    SCF: function() { Z80._r.f|=0x10; Z80._r.m=1; },
+  static void CCF();
+  static void SCF();
 
   // --- Stack ---
-    PUSHBC: function() { Z80._r.sp--; MMU.wb(Z80._r.sp,Z80._r.b); Z80._r.sp--; MMU.wb(Z80._r.sp,Z80._r.c); Z80._r.m=3; },
-    PUSHDE: function() { Z80._r.sp--; MMU.wb(Z80._r.sp,Z80._r.d); Z80._r.sp--; MMU.wb(Z80._r.sp,Z80._r.e); Z80._r.m=3; },
-    PUSHHL: function() { Z80._r.sp--; MMU.wb(Z80._r.sp,Z80._r.h); Z80._r.sp--; MMU.wb(Z80._r.sp,Z80._r.l); Z80._r.m=3; },
-    PUSHAF: function() { Z80._r.sp--; MMU.wb(Z80._r.sp,Z80._r.a); Z80._r.sp--; MMU.wb(Z80._r.sp,Z80._r.f); Z80._r.m=3; },
-
-    POPBC: function() { Z80._r.c=MMU.rb(Z80._r.sp); Z80._r.sp++; Z80._r.b=MMU.rb(Z80._r.sp); Z80._r.sp++; Z80._r.m=3; },
-    POPDE: function() { Z80._r.e=MMU.rb(Z80._r.sp); Z80._r.sp++; Z80._r.d=MMU.rb(Z80._r.sp); Z80._r.sp++; Z80._r.m=3; },
-    POPHL: function() { Z80._r.l=MMU.rb(Z80._r.sp); Z80._r.sp++; Z80._r.h=MMU.rb(Z80._r.sp); Z80._r.sp++; Z80._r.m=3; },
-    POPAF: function() { Z80._r.f=MMU.rb(Z80._r.sp); Z80._r.sp++; Z80._r.a=MMU.rb(Z80._r.sp); Z80._r.sp++; Z80._r.m=3; },
+  static void PUSHBC();
+  static void PUSHDE();
+  static void PUSHHL();
+  static void PUSHAF();
+  
+  static void POPBC();
+  static void POPDE();
+  static void POPHL();
+  static void POPAF();
 
   // --- Jump ---
-    JPnn: function() { Z80._r.pc = MMU.rw(Z80._r.pc); Z80._r.m=3; },
-    JPHL: function() { Z80._r.pc=(Z80._r.h<<8)+Z80._r.l; Z80._r.m=1; },
-    JPNZnn: function() { Z80._r.m=3; if((Z80._r.f&0x80)==0x00) { Z80._r.pc=MMU.rw(Z80._r.pc); Z80._r.m++; } else Z80._r.pc+=2; },
-    JPZnn: function()  { Z80._r.m=3; if((Z80._r.f&0x80)==0x80) { Z80._r.pc=MMU.rw(Z80._r.pc); Z80._r.m++; } else Z80._r.pc+=2; },
-    JPNCnn: function() { Z80._r.m=3; if((Z80._r.f&0x10)==0x00) { Z80._r.pc=MMU.rw(Z80._r.pc); Z80._r.m++; } else Z80._r.pc+=2; },
-    JPCnn: function()  { Z80._r.m=3; if((Z80._r.f&0x10)==0x10) { Z80._r.pc=MMU.rw(Z80._r.pc); Z80._r.m++; } else Z80._r.pc+=2; },
+  static void JPnn();
+  static void JPHL();
+  static void JPNZnn();
+  static void JPZnn();
+  static void JPNCnn();
+  static void JPCnn();
 
-    JRn: function() { var i=MMU.rb(Z80._r.pc); if(i>127) i=-((~i+1)&255); Z80._r.pc++; Z80._r.m=2; Z80._r.pc+=i; Z80._r.m++; },
-    JRNZn: function() { var i=MMU.rb(Z80._r.pc); if(i>127) i=-((~i+1)&255); Z80._r.pc++; Z80._r.m=2; if((Z80._r.f&0x80)==0x00) { Z80._r.pc+=i; Z80._r.m++; } },
-    JRZn: function()  { var i=MMU.rb(Z80._r.pc); if(i>127) i=-((~i+1)&255); Z80._r.pc++; Z80._r.m=2; if((Z80._r.f&0x80)==0x80) { Z80._r.pc+=i; Z80._r.m++; } },
-    JRNCn: function() { var i=MMU.rb(Z80._r.pc); if(i>127) i=-((~i+1)&255); Z80._r.pc++; Z80._r.m=2; if((Z80._r.f&0x10)==0x00) { Z80._r.pc+=i; Z80._r.m++; } },
-    JRCn: function()  { var i=MMU.rb(Z80._r.pc); if(i>127) i=-((~i+1)&255); Z80._r.pc++; Z80._r.m=2; if((Z80._r.f&0x10)==0x10) { Z80._r.pc+=i; Z80._r.m++; } },
+  static void JRn();
+  static void JRNZn();
+  static void JRZn();
+  static void JRNCn();
+  static void JRCn();
 
-    DJNZn: function() { var i=MMU.rb(Z80._r.pc); if(i>127) i=-((~i+1)&255); Z80._r.pc++; Z80._r.m=2; Z80._r.b--; if(Z80._r.b) { Z80._r.pc+=i; Z80._r.m++; } },
+  static void DJNZn();
 
-    CALLnn: function() { Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc+2); Z80._r.pc=MMU.rw(Z80._r.pc); Z80._r.m=5; },
-    CALLNZnn: function() { Z80._r.m=3; if((Z80._r.f&0x80)==0x00) { Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc+2); Z80._r.pc=MMU.rw(Z80._r.pc); Z80._r.m+=2; } else Z80._r.pc+=2; },
-    CALLZnn: function() { Z80._r.m=3; if((Z80._r.f&0x80)==0x80) { Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc+2); Z80._r.pc=MMU.rw(Z80._r.pc); Z80._r.m+=2; } else Z80._r.pc+=2; },
-    CALLNCnn: function() { Z80._r.m=3; if((Z80._r.f&0x10)==0x00) { Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc+2); Z80._r.pc=MMU.rw(Z80._r.pc); Z80._r.m+=2; } else Z80._r.pc+=2; },
-    CALLCnn: function() { Z80._r.m=3; if((Z80._r.f&0x10)==0x10) { Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc+2); Z80._r.pc=MMU.rw(Z80._r.pc); Z80._r.m+=2; } else Z80._r.pc+=2; },
+  static void CALLnn();
+  static void CALLNZnn();
+  static void CALLZnn();
+  static void CALLNCnn();
+  static void CALLCnn();
 
-    RET: function() { Z80._r.pc=MMU.rw(Z80._r.sp); Z80._r.sp+=2; Z80._r.m=3; },
-    RETI: function() { Z80._r.ime=1; Z80._ops.rrs(); Z80._r.pc=MMU.rw(Z80._r.sp); Z80._r.sp+=2; Z80._r.m=3; },
-    RETNZ: function() { Z80._r.m=1; if((Z80._r.f&0x80)==0x00) { Z80._r.pc=MMU.rw(Z80._r.sp); Z80._r.sp+=2; Z80._r.m+=2; } },
-    RETZ: function() { Z80._r.m=1; if((Z80._r.f&0x80)==0x80) { Z80._r.pc=MMU.rw(Z80._r.sp); Z80._r.sp+=2; Z80._r.m+=2; } },
-    RETNC: function() { Z80._r.m=1; if((Z80._r.f&0x10)==0x00) { Z80._r.pc=MMU.rw(Z80._r.sp); Z80._r.sp+=2; Z80._r.m+=2; } },
-    RETC: function() { Z80._r.m=1; if((Z80._r.f&0x10)==0x10) { Z80._r.pc=MMU.rw(Z80._r.sp); Z80._r.sp+=2; Z80._r.m+=2; } },
+  static void RET();
+  static void RETI();
+  static void RETNZ();
+  static void RETZ();
+  static void RETNC();
+  static void RETC();
 
-    RST00: function() { Z80._ops.rsv(); Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc); Z80._r.pc=0x00; Z80._r.m=3; },
-    RST08: function() { Z80._ops.rsv(); Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc); Z80._r.pc=0x08; Z80._r.m=3; },
-    RST10: function() { Z80._ops.rsv(); Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc); Z80._r.pc=0x10; Z80._r.m=3; },
-    RST18: function() { Z80._ops.rsv(); Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc); Z80._r.pc=0x18; Z80._r.m=3; },
-    RST20: function() { Z80._ops.rsv(); Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc); Z80._r.pc=0x20; Z80._r.m=3; },
-    RST28: function() { Z80._ops.rsv(); Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc); Z80._r.pc=0x28; Z80._r.m=3; },
-    RST30: function() { Z80._ops.rsv(); Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc); Z80._r.pc=0x30; Z80._r.m=3; },
-    RST38: function() { Z80._ops.rsv(); Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc); Z80._r.pc=0x38; Z80._r.m=3; },
-    RST40: function() { Z80._ops.rsv(); Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc); Z80._r.pc=0x40; Z80._r.m=3; },
-    RST48: function() { Z80._ops.rsv(); Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc); Z80._r.pc=0x48; Z80._r.m=3; },
-    RST50: function() { Z80._ops.rsv(); Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc); Z80._r.pc=0x50; Z80._r.m=3; },
-    RST58: function() { Z80._ops.rsv(); Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc); Z80._r.pc=0x58; Z80._r.m=3; },
-    RST60: function() { Z80._ops.rsv(); Z80._r.sp-=2; MMU.ww(Z80._r.sp,Z80._r.pc); Z80._r.pc=0x60; Z80._r.m=3; },
+  static void RST00();
+  static void RST08();
+  static void RST10();
+  static void RST18();
+  static void RST20();
+  static void RST28();
+  static void RST30();
+  static void RST38();
+  static void RST40();
+  static void RST48();
+  static void RST50();
+  static void RST58();
+  static void RST60();
 
-    NOP: function() { Z80._r.m=1; },
-    HALT: function() { Z80._halt=1; Z80._r.m=1; },
+  static void NOP();
+  static void HALT();
 
-    DI: function() { Z80._r.ime=0; Z80._r.m=1; },
-    EI: function() { Z80._r.ime=1; Z80._r.m=1; },
-
-  //--- Helper functions ---
-    rsv: function() {
-      Z80._rsv.a = Z80._r.a; Z80._rsv.b = Z80._r.b;
-      Z80._rsv.c = Z80._r.c; Z80._rsv.d = Z80._r.d;
-      Z80._rsv.e = Z80._r.e; Z80._rsv.f = Z80._r.f;
-      Z80._rsv.h = Z80._r.h; Z80._rsv.l = Z80._r.l;
-    },
-
-    rrs: function() {
-      Z80._r.a = Z80._rsv.a; Z80._r.b = Z80._rsv.b;
-      Z80._r.c = Z80._rsv.c; Z80._r.d = Z80._rsv.d;
-      Z80._r.e = Z80._rsv.e; Z80._r.f = Z80._rsv.f;
-      Z80._r.h = Z80._rsv.h; Z80._r.l = Z80._rsv.l;
-    },
-
-    MAPcb: function() {
-      var i=MMU.rb(Z80._r.pc); Z80._r.pc++;
-      Z80._r.pc &= 65535;
-      if(Z80._cbmap[i]) Z80._cbmap[i]();
-      else console.log(i);
-    },
-
-    XX: function() {
-      // Undefined map entry
-      var opc = Z80._r.pc-1;
-      LOG.out('Z80', 'Unimplemented instruction at $'+opc.toString(16)+', stopping.');
-      Z80._stop=1;
-    }
-  },
-
-  _map: [],
-  _cbmap: []
+  static void DI();
+  static void EI();  
 };
 
-Z80._map = [
-  // 00
-  Z80._ops.NOP,		Z80._ops.LDBCnn,	Z80._ops.LDBCmA,	Z80._ops.INCBC,
-  Z80._ops.INCr_b,	Z80._ops.DECr_b,	Z80._ops.LDrn_b,	Z80._ops.RLCA,
-  Z80._ops.LDmmSP,	Z80._ops.ADDHLBC,	Z80._ops.LDABCm,	Z80._ops.DECBC,
-  Z80._ops.INCr_c,	Z80._ops.DECr_c,	Z80._ops.LDrn_c,	Z80._ops.RRCA,
-  // 10
-  Z80._ops.DJNZn,	Z80._ops.LDDEnn,	Z80._ops.LDDEmA,	Z80._ops.INCDE,
-  Z80._ops.INCr_d,	Z80._ops.DECr_d,	Z80._ops.LDrn_d,	Z80._ops.RLA,
-  Z80._ops.JRn,		Z80._ops.ADDHLDE,	Z80._ops.LDADEm,	Z80._ops.DECDE,
-  Z80._ops.INCr_e,	Z80._ops.DECr_e,	Z80._ops.LDrn_e,	Z80._ops.RRA,
-  // 20
-  Z80._ops.JRNZn,	Z80._ops.LDHLnn,	Z80._ops.LDHLIA,	Z80._ops.INCHL,
-  Z80._ops.INCr_h,	Z80._ops.DECr_h,	Z80._ops.LDrn_h,	Z80._ops.DAA,
-  Z80._ops.JRZn,	Z80._ops.ADDHLHL,	Z80._ops.LDAHLI,	Z80._ops.DECHL,
-  Z80._ops.INCr_l,	Z80._ops.DECr_l,	Z80._ops.LDrn_l,	Z80._ops.CPL,
-  // 30
-  Z80._ops.JRNCn,	Z80._ops.LDSPnn,	Z80._ops.LDHLDA,	Z80._ops.INCSP,
-  Z80._ops.INCHLm,	Z80._ops.DECHLm,	Z80._ops.LDHLmn,	Z80._ops.SCF,
-  Z80._ops.JRCn,	Z80._ops.ADDHLSP,	Z80._ops.LDAHLD,	Z80._ops.DECSP,
-  Z80._ops.INCr_a,	Z80._ops.DECr_a,	Z80._ops.LDrn_a,	Z80._ops.CCF,
-  // 40
-  Z80._ops.LDrr_bb,	Z80._ops.LDrr_bc,	Z80._ops.LDrr_bd,	Z80._ops.LDrr_be,
-  Z80._ops.LDrr_bh,	Z80._ops.LDrr_bl,	Z80._ops.LDrHLm_b,	Z80._ops.LDrr_ba,
-  Z80._ops.LDrr_cb,	Z80._ops.LDrr_cc,	Z80._ops.LDrr_cd,	Z80._ops.LDrr_ce,
-  Z80._ops.LDrr_ch,	Z80._ops.LDrr_cl,	Z80._ops.LDrHLm_c,	Z80._ops.LDrr_ca,
-  // 50
-  Z80._ops.LDrr_db,	Z80._ops.LDrr_dc,	Z80._ops.LDrr_dd,	Z80._ops.LDrr_de,
-  Z80._ops.LDrr_dh,	Z80._ops.LDrr_dl,	Z80._ops.LDrHLm_d,	Z80._ops.LDrr_da,
-  Z80._ops.LDrr_eb,	Z80._ops.LDrr_ec,	Z80._ops.LDrr_ed,	Z80._ops.LDrr_ee,
-  Z80._ops.LDrr_eh,	Z80._ops.LDrr_el,	Z80._ops.LDrHLm_e,	Z80._ops.LDrr_ea,
-  // 60
-  Z80._ops.LDrr_hb,	Z80._ops.LDrr_hc,	Z80._ops.LDrr_hd,	Z80._ops.LDrr_he,
-  Z80._ops.LDrr_hh,	Z80._ops.LDrr_hl,	Z80._ops.LDrHLm_h,	Z80._ops.LDrr_ha,
-  Z80._ops.LDrr_lb,	Z80._ops.LDrr_lc,	Z80._ops.LDrr_ld,	Z80._ops.LDrr_le,
-  Z80._ops.LDrr_lh,	Z80._ops.LDrr_ll,	Z80._ops.LDrHLm_l,	Z80._ops.LDrr_la,
-  // 70
-  Z80._ops.LDHLmr_b,	Z80._ops.LDHLmr_c,	Z80._ops.LDHLmr_d,	Z80._ops.LDHLmr_e,
-  Z80._ops.LDHLmr_h,	Z80._ops.LDHLmr_l,	Z80._ops.HALT,		Z80._ops.LDHLmr_a,
-  Z80._ops.LDrr_ab,	Z80._ops.LDrr_ac,	Z80._ops.LDrr_ad,	Z80._ops.LDrr_ae,
-  Z80._ops.LDrr_ah,	Z80._ops.LDrr_al,	Z80._ops.LDrHLm_a,	Z80._ops.LDrr_aa,
-  // 80
-  Z80._ops.ADDr_b,	Z80._ops.ADDr_c,	Z80._ops.ADDr_d,	Z80._ops.ADDr_e,
-  Z80._ops.ADDr_h,	Z80._ops.ADDr_l,	Z80._ops.ADDHL,		Z80._ops.ADDr_a,
-  Z80._ops.ADCr_b,	Z80._ops.ADCr_c,	Z80._ops.ADCr_d,	Z80._ops.ADCr_e,
-  Z80._ops.ADCr_h,	Z80._ops.ADCr_l,	Z80._ops.ADCHL,		Z80._ops.ADCr_a,
-  // 90
-  Z80._ops.SUBr_b,	Z80._ops.SUBr_c,	Z80._ops.SUBr_d,	Z80._ops.SUBr_e,
-  Z80._ops.SUBr_h,	Z80._ops.SUBr_l,	Z80._ops.SUBHL,		Z80._ops.SUBr_a,
-  Z80._ops.SBCr_b,	Z80._ops.SBCr_c,	Z80._ops.SBCr_d,	Z80._ops.SBCr_e,
-  Z80._ops.SBCr_h,	Z80._ops.SBCr_l,	Z80._ops.SBCHL,		Z80._ops.SBCr_a,
-  // A0
-  Z80._ops.ANDr_b,	Z80._ops.ANDr_c,	Z80._ops.ANDr_d,	Z80._ops.ANDr_e,
-  Z80._ops.ANDr_h,	Z80._ops.ANDr_l,	Z80._ops.ANDHL,		Z80._ops.ANDr_a,
-  Z80._ops.XORr_b,	Z80._ops.XORr_c,	Z80._ops.XORr_d,	Z80._ops.XORr_e,
-  Z80._ops.XORr_h,	Z80._ops.XORr_l,	Z80._ops.XORHL,		Z80._ops.XORr_a,
-  // B0
-  Z80._ops.ORr_b,	Z80._ops.ORr_c,		Z80._ops.ORr_d,		Z80._ops.ORr_e,
-  Z80._ops.ORr_h,	Z80._ops.ORr_l,		Z80._ops.ORHL,		Z80._ops.ORr_a,
-  Z80._ops.CPr_b,	Z80._ops.CPr_c,		Z80._ops.CPr_d,		Z80._ops.CPr_e,
-  Z80._ops.CPr_h,	Z80._ops.CPr_l,		Z80._ops.CPHL,		Z80._ops.CPr_a,
-  // C0
-  Z80._ops.RETNZ,	Z80._ops.POPBC,		Z80._ops.JPNZnn,	Z80._ops.JPnn,
-  Z80._ops.CALLNZnn,	Z80._ops.PUSHBC,	Z80._ops.ADDn,		Z80._ops.RST00,
-  Z80._ops.RETZ,	Z80._ops.RET,		Z80._ops.JPZnn,		Z80._ops.MAPcb,
-  Z80._ops.CALLZnn,	Z80._ops.CALLnn,	Z80._ops.ADCn,		Z80._ops.RST08,
-  // D0
-  Z80._ops.RETNC,	Z80._ops.POPDE,		Z80._ops.JPNCnn,	Z80._ops.XX,
-  Z80._ops.CALLNCnn,	Z80._ops.PUSHDE,	Z80._ops.SUBn,		Z80._ops.RST10,
-  Z80._ops.RETC,	Z80._ops.RETI,		Z80._ops.JPCnn,		Z80._ops.XX,
-  Z80._ops.CALLCnn,	Z80._ops.XX,		Z80._ops.SBCn,		Z80._ops.RST18,
-  // E0
-  Z80._ops.LDIOnA,	Z80._ops.POPHL,		Z80._ops.LDIOCA,	Z80._ops.XX,
-  Z80._ops.XX,		Z80._ops.PUSHHL,	Z80._ops.ANDn,		Z80._ops.RST20,
-  Z80._ops.ADDSPn,	Z80._ops.JPHL,		Z80._ops.LDmmA,		Z80._ops.XX,
-  Z80._ops.XX,		Z80._ops.XX,		Z80._ops.XORn,		Z80._ops.RST28,
-  // F0
-  Z80._ops.LDAIOn,	Z80._ops.POPAF,		Z80._ops.LDAIOC,	Z80._ops.DI,
-  Z80._ops.XX,		Z80._ops.PUSHAF,	Z80._ops.ORn,		Z80._ops.RST30,
-  Z80._ops.LDHLSPn,	Z80._ops.XX,		Z80._ops.LDAmm,		Z80._ops.EI,
-  Z80._ops.XX,		Z80._ops.XX,		Z80._ops.CPn,		Z80._ops.RST38
-];
-
-Z80._cbmap = [
-  // CB00
-  Z80._ops.RLCr_b,	Z80._ops.RLCr_c,	Z80._ops.RLCr_d,	Z80._ops.RLCr_e,
-  Z80._ops.RLCr_h,	Z80._ops.RLCr_l,	Z80._ops.RLCHL,		Z80._ops.RLCr_a,
-  Z80._ops.RRCr_b,	Z80._ops.RRCr_c,	Z80._ops.RRCr_d,	Z80._ops.RRCr_e,
-  Z80._ops.RRCr_h,	Z80._ops.RRCr_l,	Z80._ops.RRCHL,		Z80._ops.RRCr_a,
-  // CB10
-  Z80._ops.RLr_b,	Z80._ops.RLr_c,		Z80._ops.RLr_d,		Z80._ops.RLr_e,
-  Z80._ops.RLr_h,	Z80._ops.RLr_l,		Z80._ops.RLHL,		Z80._ops.RLr_a,
-  Z80._ops.RRr_b,	Z80._ops.RRr_c,		Z80._ops.RRr_d,		Z80._ops.RRr_e,
-  Z80._ops.RRr_h,	Z80._ops.RRr_l,		Z80._ops.RRHL,		Z80._ops.RRr_a,
-  // CB20
-  Z80._ops.SLAr_b,	Z80._ops.SLAr_c,	Z80._ops.SLAr_d,	Z80._ops.SLAr_e,
-  Z80._ops.SLAr_h,	Z80._ops.SLAr_l,	Z80._ops.XX,		Z80._ops.SLAr_a,
-  Z80._ops.SRAr_b,	Z80._ops.SRAr_c,	Z80._ops.SRAr_d,	Z80._ops.SRAr_e,
-  Z80._ops.SRAr_h,	Z80._ops.SRAr_l,	Z80._ops.XX,		Z80._ops.SRAr_a,
-  // CB30
-  Z80._ops.SWAPr_b,	Z80._ops.SWAPr_c,	Z80._ops.SWAPr_d,	Z80._ops.SWAPr_e,
-  Z80._ops.SWAPr_h,	Z80._ops.SWAPr_l,	Z80._ops.XX,		Z80._ops.SWAPr_a,
-  Z80._ops.SRLr_b,	Z80._ops.SRLr_c,	Z80._ops.SRLr_d,	Z80._ops.SRLr_e,
-  Z80._ops.SRLr_h,	Z80._ops.SRLr_l,	Z80._ops.XX,		Z80._ops.SRLr_a,
-  // CB40
-  Z80._ops.BIT0b,	Z80._ops.BIT0c,		Z80._ops.BIT0d,		Z80._ops.BIT0e,
-  Z80._ops.BIT0h,	Z80._ops.BIT0l,		Z80._ops.BIT0m,		Z80._ops.BIT0a,
-  Z80._ops.BIT1b,	Z80._ops.BIT1c,		Z80._ops.BIT1d,		Z80._ops.BIT1e,
-  Z80._ops.BIT1h,	Z80._ops.BIT1l,		Z80._ops.BIT1m,		Z80._ops.BIT1a,
-  // CB50
-  Z80._ops.BIT2b,	Z80._ops.BIT2c,		Z80._ops.BIT2d,		Z80._ops.BIT2e,
-  Z80._ops.BIT2h,	Z80._ops.BIT2l,		Z80._ops.BIT2m,		Z80._ops.BIT2a,
-  Z80._ops.BIT3b,	Z80._ops.BIT3c,		Z80._ops.BIT3d,		Z80._ops.BIT3e,
-  Z80._ops.BIT3h,	Z80._ops.BIT3l,		Z80._ops.BIT3m,		Z80._ops.BIT3a,
-  // CB60
-  Z80._ops.BIT4b,	Z80._ops.BIT4c,		Z80._ops.BIT4d,		Z80._ops.BIT4e,
-  Z80._ops.BIT4h,	Z80._ops.BIT4l,		Z80._ops.BIT4m,		Z80._ops.BIT4a,
-  Z80._ops.BIT5b,	Z80._ops.BIT5c,		Z80._ops.BIT5d,		Z80._ops.BIT5e,
-  Z80._ops.BIT5h,	Z80._ops.BIT5l,		Z80._ops.BIT5m,		Z80._ops.BIT5a,
-  // CB70
-  Z80._ops.BIT6b,	Z80._ops.BIT6c,		Z80._ops.BIT6d,		Z80._ops.BIT6e,
-  Z80._ops.BIT6h,	Z80._ops.BIT6l,		Z80._ops.BIT6m,		Z80._ops.BIT6a,
-  Z80._ops.BIT7b,	Z80._ops.BIT7c,		Z80._ops.BIT7d,		Z80._ops.BIT7e,
-  Z80._ops.BIT7h,	Z80._ops.BIT7l,		Z80._ops.BIT7m,		Z80._ops.BIT7a,
-  // CB80
-  Z80._ops.RES0b,	Z80._ops.RES0c,		Z80._ops.RES0d,		Z80._ops.RES0e,
-  Z80._ops.RES0h,	Z80._ops.RES0l,		Z80._ops.RES0m,		Z80._ops.RES0a,
-  Z80._ops.RES1b,	Z80._ops.RES1c,		Z80._ops.RES1d,		Z80._ops.RES1e,
-  Z80._ops.RES1h,	Z80._ops.RES1l,		Z80._ops.RES1m,		Z80._ops.RES1a,
-  // CB90
-  Z80._ops.RES2b,	Z80._ops.RES2c,		Z80._ops.RES2d,		Z80._ops.RES2e,
-  Z80._ops.RES2h,	Z80._ops.RES2l,		Z80._ops.RES2m,		Z80._ops.RES2a,
-  Z80._ops.RES3b,	Z80._ops.RES3c,		Z80._ops.RES3d,		Z80._ops.RES3e,
-  Z80._ops.RES3h,	Z80._ops.RES3l,		Z80._ops.RES3m,		Z80._ops.RES3a,
-  // CBA0
-  Z80._ops.RES4b,	Z80._ops.RES4c,		Z80._ops.RES4d,		Z80._ops.RES4e,
-  Z80._ops.RES4h,	Z80._ops.RES4l,		Z80._ops.RES4m,		Z80._ops.RES4a,
-  Z80._ops.RES5b,	Z80._ops.RES5c,		Z80._ops.RES5d,		Z80._ops.RES5e,
-  Z80._ops.RES5h,	Z80._ops.RES5l,		Z80._ops.RES5m,		Z80._ops.RES5a,
-  // CBB0
-  Z80._ops.RES6b,	Z80._ops.RES6c,		Z80._ops.RES6d,		Z80._ops.RES6e,
-  Z80._ops.RES6h,	Z80._ops.RES6l,		Z80._ops.RES6m,		Z80._ops.RES6a,
-  Z80._ops.RES7b,	Z80._ops.RES7c,		Z80._ops.RES7d,		Z80._ops.RES7e,
-  Z80._ops.RES7h,	Z80._ops.RES7l,		Z80._ops.RES7m,		Z80._ops.RES7a,
-  // CBC0
-  Z80._ops.SET0b,	Z80._ops.SET0c,		Z80._ops.SET0d,		Z80._ops.SET0e,
-  Z80._ops.SET0h,	Z80._ops.SET0l,		Z80._ops.SET0m,		Z80._ops.SET0a,
-  Z80._ops.SET1b,	Z80._ops.SET1c,		Z80._ops.SET1d,		Z80._ops.SET1e,
-  Z80._ops.SET1h,	Z80._ops.SET1l,		Z80._ops.SET1m,		Z80._ops.SET1a,
-  // CBD0
-  Z80._ops.SET2b,	Z80._ops.SET2c,		Z80._ops.SET2d,		Z80._ops.SET2e,
-  Z80._ops.SET2h,	Z80._ops.SET2l,		Z80._ops.SET2m,		Z80._ops.SET2a,
-  Z80._ops.SET3b,	Z80._ops.SET3c,		Z80._ops.SET3d,		Z80._ops.SET3e,
-  Z80._ops.SET3h,	Z80._ops.SET3l,		Z80._ops.SET3m,		Z80._ops.SET3a,
-  // CBE0
-  Z80._ops.SET4b,	Z80._ops.SET4c,		Z80._ops.SET4d,		Z80._ops.SET4e,
-  Z80._ops.SET4h,	Z80._ops.SET4l,		Z80._ops.SET4m,		Z80._ops.SET4a,
-  Z80._ops.SET5b,	Z80._ops.SET5c,		Z80._ops.SET5d,		Z80._ops.SET5e,
-  Z80._ops.SET5h,	Z80._ops.SET5l,		Z80._ops.SET5m,		Z80._ops.SET5a,
-  // CBF0
-  Z80._ops.SET6b,	Z80._ops.SET6c,		Z80._ops.SET6d,		Z80._ops.SET6e,
-  Z80._ops.SET6h,	Z80._ops.SET6l,		Z80._ops.SET6m,		Z80._ops.SET6a,
-  Z80._ops.SET7b,	Z80._ops.SET7c,		Z80._ops.SET7d,		Z80._ops.SET7e,
-  Z80._ops.SET7h,	Z80._ops.SET7l,		Z80._ops.SET7m,		Z80._ops.SET7a,
-];
-
-*/
