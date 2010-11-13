@@ -1,3 +1,6 @@
+#ifndef MMU_H_
+#define MMU_H_
+
 #include <string>
 
 struct MBC {
@@ -25,9 +28,12 @@ class MMU{
   static int _if;
   
   // methods
+  static void reset();
   static void load(std::string file);
   static int rb(int addr);
   static int rw(int addr);
   static void wb(int addr, int val);
   static void ww(int addr, int val);  
 };
+
+#endif

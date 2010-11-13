@@ -1,58 +1,6 @@
-namespace GPU {
+#include "./gpu.h"
 
-int _vram[8192];
-int _oam[160];
-//  _reg: [],
-int _tilemap[512][8][8];
-
-
-struct Obj {
-  int y;
-  int x;
-  int tile;
-  int palette;
-  int yflip;
-  int xflip;
-  int prio;
-  int num;     
-};
-Obj _objdata[40];
-
-//_objdatasorted: [],
-
-struct Palette {
-  int bg[4];
-  int obj0[4];
-  int obj1[4];
-};
-Palette _palette;
-
-int _scanrow[160];
-
-int _curline = 0;
-int _curscan = 0;
-int _linemode = 0;
-int _modeclocks = 0;
-
-int _yscrl = 0;
-int _xscrl = 0;
-int _raster = 0;
-int _ints = 0;
-  
-int _lcdon = 0;
-int _bgon = 0;
-int _objon = 0;
-int _winon = 0;
-
-int _objsize = 0;
-
-int _bgtilebase = 0x0000;
-int _bgmapbase = 0x1800;
-int _wintilebase = 0x1800;
-
-int i,j,k;
-
-void reset(){
+void GPU::reset(){
   for(i=0; i<8192; i++) {
     _vram[i] = 0;
   }
@@ -79,31 +27,31 @@ void reset(){
 
   // pay attention homie.
   //
-  // var c = document.getElementById("screen");
+  // int c = document.getElementById("screen");
   //
   //
   /*
-  if(c && c.getContext)
+    if(c && c.getContext)
     {
-      GPU._canvas = c.getContext("2d");
-      if(!GPU._canvas)
-      {
-        throw new Error("GPU: Canvas context could not be created.");
-      }
-      else
-      {
-        if(GPU._canvas.createImageData)
-          GPU._scrn = GPU._canvas.createImageData(160,144);
-        else if(GPU._canvas.getImageData)
-          GPU._scrn = GPU._canvas.getImageData(0,0,160,144);
-        else
-          GPU._scrn = {"width":160, "height":144, "data":new Array(160*144*4)};
+    _canvas = c.getContext("2d");
+    if(!_canvas)
+    {
+    throw new Error("GPU: Canvas context could not be created.");
+    }
+    else
+    {
+    if(_canvas.createImageData)
+    _scrn = _canvas.createImageData(160,144);
+    else if(_canvas.getImageData)
+    _scrn = _canvas.getImageData(0,0,160,144);
+    else
+    _scrn = {"width":160, "height":144, "data":new Array(160*144*4)};
 
-        for(i=0; i<GPU._scrn.data.length; i++)
-          GPU._scrn.data[i]=255;
+    for(i=0; i<_scrn.data.length; i++)
+    _scrn.data[i]=255;
 
-        GPU._canvas.putImageData(GPU._scrn, 0,0);
-      }
+    _canvas.putImageData(_scrn, 0,0);
+    }
     }
   */
   _curline=0;
@@ -138,324 +86,313 @@ void reset(){
   _wintilebase = 0x1800;
 
   // LOG::out("GPU", "Reset.");
-} // void reset()
+}
 
 
-  checkline: function() {
-    GPU._modeclocks += Z80._r.m;
-    switch(GPU._linemode)
-    {
-      // In hblank
-      case 0:
-        if(GPU._modeclocks >= 51)
-        {
-          // End of hblank for last scanline; render screen
-          if(GPU._curline == 143)
-          {
-            GPU._linemode = 1;
-            GPU._canvas.putImageData(GPU._scrn, 0,0);
-            MMU._if |= 1;
-          }
-          else
-          {
-            GPU._linemode = 2;
-          }
-          GPU._curline++;
-	  GPU._curscan += 640;
-          GPU._modeclocks=0;
+void GPU::checkline(){
+  _modeclocks += Z80._r.m;
+  switch(_linemode) {
+    // In hblank
+    case 0:
+      if(_modeclocks >= 51) {
+        // End of hblank for last scanline; render screen
+        if(_curline == 143) {
+          _linemode = 1;
+          _canvas.putImageData(_scrn, 0,0);
+          MMU._if |= 1;
+        } else {
+          _linemode = 2;
         }
-        break;
-
+        _curline++;
+        _curscan += 640;
+        _modeclocks=0;
+      }
+      break;
+      
       // In vblank
-      case 1:
-        if(GPU._modeclocks >= 114)
-        {
-          GPU._modeclocks = 0;
-          GPU._curline++;
-          if(GPU._curline > 153)
-          {
-            GPU._curline = 0;
-	    GPU._curscan = 0;
-            GPU._linemode = 2;
-          }
+    case 1:
+      if(_modeclocks >= 114) {
+        _modeclocks = 0;
+        _curline++;
+        if(_curline > 153) {
+          _curline = 0;
+          _curscan = 0;
+          _linemode = 2;
         }
-        break;
-
+      }
+      break;
+      
       // In OAM-read mode
-      case 2:
-        if(GPU._modeclocks >= 20)
-        {
-          GPU._modeclocks = 0;
-          GPU._linemode = 3;
-        }
-        break;
-
+    case 2:
+      if(_modeclocks >= 20) {
+        _modeclocks = 0;
+        _linemode = 3;
+      }
+      break;
+      
       // In VRAM-read mode
-      case 3:
-        // Render scanline at end of allotted time
-        if(GPU._modeclocks >= 43)
-        {
-          GPU._modeclocks = 0;
-          GPU._linemode = 0;
-          if(GPU._lcdon)
-          {
-            if(GPU._bgon)
-            {
-              var linebase = GPU._curscan;
-              var mapbase = GPU._bgmapbase + ((((GPU._curline+GPU._yscrl)&255)>>3)<<5);
-              var y = (GPU._curline+GPU._yscrl)&7;
-              var x = GPU._xscrl&7;
-              var t = (GPU._xscrl>>3)&31;
-              var pixel;
-              var w=160;
-
-              if(GPU._bgtilebase)
-              {
-	        var tile = GPU._vram[mapbase+t];
-		if(tile<128) tile=256+tile;
-                var tilerow = GPU._tilemap[tile][y];
-                do
-                {
-		  GPU._scanrow[160-x] = tilerow[x];
-                  GPU._scrn.data[linebase+3] = GPU._palette.bg[tilerow[x]];
-                  x++;
-                  if(x==8) { t=(t+1)&31; x=0; tile=GPU._vram[mapbase+t]; if(tile<128) tile=256+tile; tilerow = GPU._tilemap[tile][y]; }
-                  linebase+=4;
-                } while(--w);
-              }
-              else
-              {
-                var tilerow=GPU._tilemap[GPU._vram[mapbase+t]][y];
-                do
-                {
-		  GPU._scanrow[160-x] = tilerow[x];
-                  GPU._scrn.data[linebase+3] = GPU._palette.bg[tilerow[x]];
-                  x++;
-                  if(x==8) { t=(t+1)&31; x=0; tilerow=GPU._tilemap[GPU._vram[mapbase+t]][y]; }
-                  linebase+=4;
-                } while(--w);
-	      }
+    case 3:
+      // Render scanline at end of allotted time
+      if(_modeclocks >= 43) {
+        _modeclocks = 0;
+        _linemode = 0;
+        if(_lcdon) {
+          if(_bgon) {
+            int linebase = _curscan;
+            int mapbase = _bgmapbase + ((((_curline+_yscrl)&255)>>3)<<5);
+            int y = (_curline+_yscrl)&7;
+            int x = _xscrl&7;
+            int t = (_xscrl>>3)&31;
+            int pixel;
+            int w=160;
+            
+            if(_bgtilebase) {
+              int tile = _vram[mapbase+t];
+              if(tile<128) tile=256+tile;
+              int tilerow = _tilemap[tile][y];
+              do {
+                _scanrow[160-x] = tilerow[x];
+                _scrn.data[linebase+3] = _palette.bg[tilerow[x]];
+                x++;
+                if(x==8) { t=(t+1)&31; x=0; tile=_vram[mapbase+t]; if(tile<128) tile=256+tile; tilerow = _tilemap[tile][y]; }
+                linebase+=4;
+              } while(--w);
             }
-            if(GPU._objon)
+            else
             {
-              var cnt = 0;
-              if(GPU._objsize)
+              int tilerow=_tilemap[_vram[mapbase+t]][y];
+              do
               {
-                for(var i=0; i<40; i++)
-                {
-                }
+                _scanrow[160-x] = tilerow[x];
+                _scrn.data[linebase+3] = _palette.bg[tilerow[x]];
+                x++;
+                if(x==8) { t=(t+1)&31; x=0; tilerow=_tilemap[_vram[mapbase+t]][y]; }
+                linebase+=4;
+              } while(--w);
+            }
+          }
+          if(_objon)
+          {
+            int cnt = 0;
+            if(_objsize)
+            {
+              for(int i=0; i<40; i++)
+              {
               }
-              else
+            }
+            else
+            {
+              int tilerow;
+              int obj;
+              int pal;
+              int pixel;
+              int x;
+              int linebase = _curscan;
+              for(int i=0; i<40; i++)
               {
-                var tilerow;
-                var obj;
-                var pal;
-                var pixel;
-                var x;
-                var linebase = GPU._curscan;
-                for(var i=0; i<40; i++)
+                obj = _objdatasorted[i];
+                if(obj.y <= _curline && (obj.y+8) > _curline)
                 {
-                  obj = GPU._objdatasorted[i];
-                  if(obj.y <= GPU._curline && (obj.y+8) > GPU._curline)
+                  if(obj.yflip)
+                    tilerow = _tilemap[obj.tile][7-(_curline-obj.y)];
+                  else
+                    tilerow = _tilemap[obj.tile][_curline-obj.y];
+
+                  if(obj.palette) pal=_palette.obj1;
+                  else pal=_palette.obj0;
+
+                  linebase = (_curline*160+obj.x)*4;
+                  if(obj.xflip)
                   {
-                    if(obj.yflip)
-                      tilerow = GPU._tilemap[obj.tile][7-(GPU._curline-obj.y)];
-                    else
-                      tilerow = GPU._tilemap[obj.tile][GPU._curline-obj.y];
-
-                    if(obj.palette) pal=GPU._palette.obj1;
-                    else pal=GPU._palette.obj0;
-
-                    linebase = (GPU._curline*160+obj.x)*4;
-                    if(obj.xflip)
+                    for(x=0; x<8; x++)
                     {
-                      for(x=0; x<8; x++)
+                      if(obj.x+x >=0 && obj.x+x < 160)
                       {
-                        if(obj.x+x >=0 && obj.x+x < 160)
+                        if(tilerow[7-x] && (obj.prio || !_scanrow[x]))
                         {
-                          if(tilerow[7-x] && (obj.prio || !GPU._scanrow[x]))
-                          {
-                            GPU._scrn.data[linebase+3] = pal[tilerow[7-x]];
-                          }
+                          _scrn.data[linebase+3] = pal[tilerow[7-x]];
                         }
-                        linebase+=4;
                       }
+                      linebase+=4;
                     }
-                    else
-                    {
-                      for(x=0; x<8; x++)
-                      {
-                        if(obj.x+x >=0 && obj.x+x < 160)
-                        {
-                          if(tilerow[x] && (obj.prio || !GPU._scanrow[x]))
-                          {
-                            GPU._scrn.data[linebase+3] = pal[tilerow[x]];
-                          }
-                        }
-                        linebase+=4;
-                      }
-                    }
-                    cnt++; if(cnt>10) break;
                   }
+                  else
+                  {
+                    for(x=0; x<8; x++)
+                    {
+                      if(obj.x+x >=0 && obj.x+x < 160)
+                      {
+                        if(tilerow[x] && (obj.prio || !_scanrow[x]))
+                        {
+                          _scrn.data[linebase+3] = pal[tilerow[x]];
+                        }
+                      }
+                      linebase+=4;
+                    }
+                  }
+                  cnt++; if(cnt>10) break;
                 }
               }
             }
           }
         }
-        break;
-    }
-  },
+      }
+      break;
+  }
+}
 
-  updatetile: function(addr,val) {
-    var saddr = addr;
-    if(addr&1) { saddr--; addr--; }
-    var tile = (addr>>4)&511;
-    var y = (addr>>1)&7;
-    var sx;
-    for(var x=0;x<8;x++)
+void updatetile(int addr, int val) {
+  int saddr = addr;
+  if(addr&1) { saddr--; addr--; }
+  int tile = (addr>>4)&511;
+  int y = (addr>>1)&7;
+  int sx;
+  for(int x=0;x<8;x++) {
+    sx=1<<(7-x);
+    _tilemap[tile][y][x] = ((_vram[saddr]&sx)?1:0) | ((_vram[saddr+1]&sx)?2:0);
+  }
+}
+  
+void updateoam(int addr, int val){
+  addr-=0xFE00;
+  int obj=addr>>2;
+  if(obj<40)
+  {
+    switch(addr&3)
     {
-      sx=1<<(7-x);
-      GPU._tilemap[tile][y][x] = ((GPU._vram[saddr]&sx)?1:0) | ((GPU._vram[saddr+1]&sx)?2:0);
-    }
-  },
-
-  updateoam: function(addr,val) {
-    addr-=0xFE00;
-    var obj=addr>>2;
-    if(obj<40)
-    {
-      switch(addr&3)
-      {
-        case 0: GPU._objdata[obj].y=val-16; break;
-        case 1: GPU._objdata[obj].x=val-8; break;
-        case 2:
-          if(GPU._objsize) GPU._objdata[obj].tile = (val&0xFE);
-          else GPU._objdata[obj].tile = val;
-          break;
-        case 3:
-          GPU._objdata[obj].palette = (val&0x10)?1:0;
-          GPU._objdata[obj].xflip = (val&0x20)?1:0;
-          GPU._objdata[obj].yflip = (val&0x40)?1:0;
-          GPU._objdata[obj].prio = (val&0x80)?1:0;
-          break;
-     }
-    }
-    GPU._objdatasorted = GPU._objdata;
-    GPU._objdatasorted.sort(function(a,b){
-      if(a.x>b.x) return -1;
-      if(a.num>b.num) return -1;
-    });
-  },
-
-  rb: function(addr) {
-    var gaddr = addr-0xFF40;
-    switch(gaddr)
-    {
-      case 0:
-        return (GPU._lcdon?0x80:0)|
-               ((GPU._bgtilebase==0x0000)?0x10:0)|
-               ((GPU._bgmapbase==0x1C00)?0x08:0)|
-               (GPU._objsize?0x04:0)|
-               (GPU._objon?0x02:0)|
-               (GPU._bgon?0x01:0);
-
-      case 1:
-        return (GPU._curline==GPU._raster?4:0)|GPU._linemode;
-
+      case 0: _objdata[obj].y=val-16; break;
+      case 1: _objdata[obj].x=val-8; break;
       case 2:
-        return GPU._yscrl;
-
+        if(_objsize) _objdata[obj].tile = (val&0xFE);
+        else _objdata[obj].tile = val;
+        break;
       case 3:
-        return GPU._xscrl;
-
-      case 4:
-        return GPU._curline;
-
-      case 5:
-        return GPU._raster;
-
-      default:
-        return GPU._reg[gaddr];
-    }
-  },
-
-  wb: function(addr,val) {
-    var gaddr = addr-0xFF40;
-    GPU._reg[gaddr] = val;
-    switch(gaddr)
-    {
-      case 0:
-        GPU._lcdon = (val&0x80)?1:0;
-        GPU._bgtilebase = (val&0x10)?0x0000:0x0800;
-        GPU._bgmapbase = (val&0x08)?0x1C00:0x1800;
-        GPU._objsize = (val&0x04)?1:0;
-        GPU._objon = (val&0x02)?1:0;
-        GPU._bgon = (val&0x01)?1:0;
-        break;
-
-      case 2:
-        GPU._yscrl = val;
-        break;
-
-      case 3:
-        GPU._xscrl = val;
-        break;
-
-      case 5:
-        GPU._raster = val;
-
-      // OAM DMA
-      case 6:
-        var v;
-        for(var i=0; i<160; i++)
-        {
-          v = MMU.rb((val<<8)+i);
-          GPU._oam[i] = v;
-          GPU.updateoam(0xFE00+i, v);
-        }
-        break;
-
-      // BG palette mapping
-      case 7:
-        for(var i=0;i<4;i++)
-        {
-          switch((val>>(i*2))&3)
-          {
-            case 0: GPU._palette.bg[i] = 255; break;
-            case 1: GPU._palette.bg[i] = 192; break;
-            case 2: GPU._palette.bg[i] = 96; break;
-            case 3: GPU._palette.bg[i] = 0; break;
-          }
-        }
-        break;
-
-      // OBJ0 palette mapping
-      case 8:
-        for(var i=0;i<4;i++)
-        {
-          switch((val>>(i*2))&3)
-          {
-            case 0: GPU._palette.obj0[i] = 255; break;
-            case 1: GPU._palette.obj0[i] = 192; break;
-            case 2: GPU._palette.obj0[i] = 96; break;
-            case 3: GPU._palette.obj0[i] = 0; break;
-          }
-        }
-        break;
-
-      // OBJ1 palette mapping
-      case 9:
-        for(var i=0;i<4;i++)
-        {
-          switch((val>>(i*2))&3)
-          {
-            case 0: GPU._palette.obj1[i] = 255; break;
-            case 1: GPU._palette.obj1[i] = 192; break;
-            case 2: GPU._palette.obj1[i] = 96; break;
-            case 3: GPU._palette.obj1[i] = 0; break;
-          }
-        }
+        _objdata[obj].palette = (val&0x10)?1:0;
+        _objdata[obj].xflip = (val&0x20)?1:0;
+        _objdata[obj].yflip = (val&0x40)?1:0;
+        _objdata[obj].prio = (val&0x80)?1:0;
         break;
     }
   }
-};
+  _objdatasorted = _objdata;
+
+  // need to sort this array.
+  //
+  //_objdatasorted.sort(function(a,b){
+  // if(a.x>b.x) return -1;
+  // if(a.num>b.num) return -1;
+  //});
+}
+
+  rb: function(addr) {
+    int gaddr = addr-0xFF40;
+    switch(gaddr)
+    {
+      case 0:
+        return (_lcdon?0x80:0)|
+            ((_bgtilebase==0x0000)?0x10:0)|
+            ((_bgmapbase==0x1C00)?0x08:0)|
+            (_objsize?0x04:0)|
+            (_objon?0x02:0)|
+            (_bgon?0x01:0);
+
+      case 1:
+        return (_curline==_raster?4:0)|_linemode;
+
+      case 2:
+        return _yscrl;
+
+      case 3:
+        return _xscrl;
+
+      case 4:
+        return _curline;
+
+      case 5:
+        return _raster;
+
+      default:
+        return _reg[gaddr];
+    }
+}
+
+void wb(addr,val) {
+  int gaddr = addr-0xFF40;
+  _reg[gaddr] = val;
+  switch(gaddr)
+  {
+    case 0:
+      _lcdon = (val&0x80)?1:0;
+      _bgtilebase = (val&0x10)?0x0000:0x0800;
+      _bgmapbase = (val&0x08)?0x1C00:0x1800;
+      _objsize = (val&0x04)?1:0;
+      _objon = (val&0x02)?1:0;
+      _bgon = (val&0x01)?1:0;
+      break;
+
+    case 2:
+      _yscrl = val;
+      break;
+
+    case 3:
+      _xscrl = val;
+      break;
+
+    case 5:
+      _raster = val;
+
+      // OAM DMA
+    case 6:
+      int v;
+      for(int i=0; i<160; i++)
+      {
+        v = MMU.rb((val<<8)+i);
+        _oam[i] = v;
+        updateoam(0xFE00+i, v);
+      }
+      break;
+
+      // BG palette mapping
+    case 7:
+      for(int i=0;i<4;i++)
+      {
+        switch((val>>(i*2))&3)
+        {
+          case 0: _palette.bg[i] = 255; break;
+          case 1: _palette.bg[i] = 192; break;
+          case 2: _palette.bg[i] = 96; break;
+          case 3: _palette.bg[i] = 0; break;
+        }
+      }
+      break;
+
+      // OBJ0 palette mapping
+    case 8:
+      for(int i=0;i<4;i++)
+      {
+        switch((val>>(i*2))&3)
+        {
+          case 0: _palette.obj0[i] = 255; break;
+          case 1: _palette.obj0[i] = 192; break;
+          case 2: _palette.obj0[i] = 96; break;
+          case 3: _palette.obj0[i] = 0; break;
+        }
+      }
+      break;
+
+      // OBJ1 palette mapping
+    case 9:
+      for(int i=0; i<4; i++)
+      {
+        switch((val>>(i*2))&3)
+        {
+          case 0: _palette.obj1[i] = 255; break;
+          case 1: _palette.obj1[i] = 192; break;
+          case 2: _palette.obj1[i] = 96; break;
+          case 3: _palette.obj1[i] = 0; break;
+        }
+      }
+      break;
+  }
+}
+
